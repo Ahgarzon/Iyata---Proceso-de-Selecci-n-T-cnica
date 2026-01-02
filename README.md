@@ -1,4 +1,5 @@
 # ChatVersa — Proceso de Selección Técnica  
+Soy Angel Garzón Sarzosa, Ing en Automática Industrial.
 ## PARTE A
 
 ---
