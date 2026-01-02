@@ -1,0 +1,3332 @@
+{
+  "name": "WF4 — DV_Trello_Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "beb001f0-383d-4051-880c-725f06a4bc6a",
+              "name": "phoneE164",
+              "value": "={{ \n  String(\n    $json.body?.conversation?.meta?.sender?.phone_number     // Chatwoot (widget)\n    || $json.body?.messages?.[0]?.sender?.phone_number       // Chatwoot (otro formato)\n    || $json.sender?.phone_number                            // Chatwoot fallback ||$json.metadata.display_phone_number ||\n $('WhatsApp Trigger').item.json.metadata.display_phone_number \n    ||   $('WhatsApp Trigger').item.json.messages[0].from\n    ||  ''\n  )\n  .replace(/\\s+/g,'')\n  .replace(/\\D/g,'')\n}}",
+              "type": "string"
+            },
+            {
+              "id": "54110db8-3776-4d13-9b11-336a00752742",
+              "name": "nombre",
+              "value": "={{ \n  $json.body?.conversation?.meta?.sender?.name ||\n  $json.body?.messages?.[0]?.sender?.name ||\n  null\n}}",
+              "type": "string"
+            },
+            {
+              "id": "acefe4a2-6351-4a58-9cac-5031e118fe84",
+              "name": "email",
+              "value": "={{ \n  $json.body?.conversation?.meta?.sender?.email ||\n  $json.body?.messages?.[0]?.sender?.email ||\n  null\n}}",
+              "type": "string"
+            },
+            {
+              "id": "54aaf7bc-6df9-4f2d-9cd6-a8a7d1617725",
+              "name": "pais",
+              "value": "={{ \n  ($json.body?.conversation?.meta?.sender?.additional_attributes?.country_code || 'CO').toUpperCase() \n}}",
+              "type": "string"
+            },
+            {
+              "id": "711680da-3973-4232-9c9e-8061d37235fd",
+              "name": "canal",
+              "value": "=chat",
+              "type": "string"
+            },
+            {
+              "id": "53814f38-1c56-4c7d-b9c2-cd715e523c60",
+              "name": "intencion",
+              "value": "={{ /cotiz|precio|presup|cotar/i.test(      $json.body?.content || $json.body?.conversation?.messages?.[0]?.content || ''    )    ? 'cotizacion'    : 'consulta' }}",
+              "type": "string"
+            },
+            {
+              "id": "ceedb723-6fef-472a-8be8-17ba2add8e79",
+              "name": "mensajeOriginal",
+              "value": "={{ $json.mensajeOriginal\n   || $json.message\n   || $json.body\n   || $json.messages?.[0]?.text?.body }}",
+              "type": "string"
+            },
+            {
+              "id": "8f484e46-1d6a-44a3-8730-59e75b427955",
+              "name": "actualizadoEn",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "d586c2e1-ebfa-47d9-80a4-c178a390e819",
+              "name": "ultimoContacto",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "f39dbf9f-e348-4128-a9f9-9ecfc2115a1f",
+              "name": "numeroVisitas",
+              "value": "={{ Number($json.numeroVisitas || 0) + 1 }}",
+              "type": "string"
+            },
+            {
+              "id": "40c16c79-3e81-409d-8976-935391ac330b",
+              "name": "contactId",
+              "value": "={{ String(\n  $json.body?.conversation?.contact_inbox?.contact_id ||   // ✅ el correcto\n  $json.body?.messages?.[0]?.sender_id ||\n  $json.sender?.id ||\n  ''\n) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -896,
+        384
+      ],
+      "id": "3b7c27d8-8f6c-41c2-992e-873b0f1dc296",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "beb001f0-383d-4051-880c-725f06a4bc6a",
+              "name": "clienteId",
+              "value": "={{ ('dv-cli-' + (Date.now().toString(36) + Math.random().toString(36).slice(2,10)))\n   .replace(/\\\\n/g,'').replace(/\\s+/g,'').replace(/[^a-z0-9\\-]/gi,'') }}",
+              "type": "string"
+            },
+            {
+              "id": "54110db8-3776-4d13-9b11-336a00752742",
+              "name": "creadoEn",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "acefe4a2-6351-4a58-9cac-5031e118fe84",
+              "name": "actualizadoEn",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "54aaf7bc-6df9-4f2d-9cd6-a8a7d1617725",
+              "name": "estado",
+              "value": "=prospecto",
+              "type": "string"
+            },
+            {
+              "id": "07d511e2-751e-4b7c-9e18-17db2ccf71ca",
+              "name": "primerContacto",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "3ca4070d-02b6-4755-b04b-6d9a927bea05",
+              "name": "ultimoContacto",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "a420791c-c08d-4a0d-abe1-adf4fd3ef9a9",
+              "name": "numeroVisitas",
+              "value": "1",
+              "type": "string"
+            },
+            {
+              "id": "b270b4eb-2faa-4bc9-a25c-0cdd0ef0460a",
+              "name": "phoneE164",
+              "value": "={{$('Edit Fields').item.json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "37af92e0-68ce-4b82-af6c-c658daa46965",
+              "name": "email",
+              "value": "={{$('Edit Fields').item.json.email}}",
+              "type": "string"
+            },
+            {
+              "id": "470eefc0-5054-4fac-b529-2c4aa4f703e4",
+              "name": "pais",
+              "value": "={{$('Edit Fields').item.json.pais}}",
+              "type": "string"
+            },
+            {
+              "id": "2fdbdf87-fc51-4f63-8a46-7f0e0c6d7af5",
+              "name": "origen",
+              "value": "={{$('Edit Fields').item.json.origen}}",
+              "type": "string"
+            },
+            {
+              "id": "2413d701-1e62-4bec-93aa-005e1f2dc7d8",
+              "name": "canal",
+              "value": "={{$('Edit Fields').item.json.canal}}",
+              "type": "string"
+            },
+            {
+              "id": "f6fcf975-0027-4bcc-8a42-d35cfe8b61df",
+              "name": "intencion",
+              "value": "={{$('Edit Fields').item.json.intencion}}",
+              "type": "string"
+            },
+            {
+              "id": "ed76fd39-184e-4562-903d-292f5b11f55e",
+              "name": "mensajeOriginal",
+              "value": "={{$('Edit Fields').item.json.mensajeOriginal}}",
+              "type": "string"
+            },
+            {
+              "id": "65c4622c-9c0b-423c-bd18-f7445b10cd53",
+              "name": "nombre",
+              "value": "={{$('Edit Fields').item.json.nombre}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        192
+      ],
+      "id": "cf337f24-f0b7-490c-bbf5-8008daca6b85",
+      "name": "DV IDs & Times"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, nombre, email, pais, estado, origen, canal, intencion, mensajeOriginal, primerContacto, ultimoContacto, numeroVisitas, clienteId, creadoEn, actualizadoEn"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        192
+      ],
+      "id": "ce67f394-90b3-491a-81f7-4802c61c7751",
+      "name": "Clients: Upsert (Create"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "projectId": "dv-system-6aade",
+        "collection": "=clientes/{{ String($json.phoneE164 || '').trim().replace(/\\s+/g,'').replace(/(?!^\\+)[^0-9]/g,'') }}/logs",
+        "documentId": "={{Date.now().toString() }}",
+        "columns": "origen, canal, intencion, mensajeOriginal, creadoEn, por, evento, phoneE164, clienteId"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        96
+      ],
+      "id": "7a9a2519-bf1b-47cf-bf52-d45f732f05d4",
+      "name": "Logs: Create1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e8909f9b-a9f2-4857-8ddd-6527b1589e46",
+              "name": "origen",
+              "value": "=intake",
+              "type": "string"
+            },
+            {
+              "id": "711680da-3973-4232-9c9e-8061d37235fd",
+              "name": "canal",
+              "value": "={{ $json.canal }}",
+              "type": "string"
+            },
+            {
+              "id": "53814f38-1c56-4c7d-b9c2-cd715e523c60",
+              "name": "=intencion",
+              "value": "={{ $json.intencion }}",
+              "type": "string"
+            },
+            {
+              "id": "3d8ea1e9-7fe7-4101-b0ff-f1678834f36f",
+              "name": "mensajeOriginal",
+              "value": "={{ $('Edit Fields').item.json.mensajeOriginal }}",
+              "type": "string"
+            },
+            {
+              "id": "dbe0229b-7232-42bc-9893-e85c1198c68e",
+              "name": "creadoEn",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "f157e60c-1260-4177-84bc-11d296bfb0d7",
+              "name": "por",
+              "value": "n8n",
+              "type": "string"
+            },
+            {
+              "id": "8bb29039-14c5-49a8-ba52-e136c41e69b0",
+              "name": "evento",
+              "value": "cliente.creado",
+              "type": "string"
+            },
+            {
+              "id": "e1313acc-b24a-4b80-8298-511f66496d53",
+              "name": "clienteId",
+              "value": "={{ $json.clienteId }}",
+              "type": "string"
+            },
+            {
+              "id": "18f11be2-ce11-44d2-92e0-0bca79d58e52",
+              "name": "phoneE164",
+              "value": "={{ $('Edit Fields').item.json.phoneE164 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        96
+      ],
+      "id": "9aa46f8e-a355-45da-a126-57ec00902298",
+      "name": "DV Log (Set – Create)"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "documentId": "={{ $json.phoneE164}}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        320
+      ],
+      "id": "bd534619-15ca-44b4-9ba8-b67998134ee7",
+      "name": "Clients: Get by ID",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dv-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        288
+      ],
+      "id": "acf16e40-16ae-4872-92db-1c384faf72dd",
+      "name": "Webhook",
+      "webhookId": "18259ed8-e6ab-4609-9f0c-efd8f35172d0"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "documentId": "={{ $json.phoneE164 }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        96
+      ],
+      "id": "4b61da97-ee3a-4c37-bf9a-c495fa70be72",
+      "name": "verifcar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "843ffa24-120e-4230-adf2-ecf21789d14f",
+              "leftValue": "={{ $node[\"Clients: Get by ID\"].json._id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        384
+      ],
+      "id": "5087ac8a-10f4-419b-9602-52c14d61014d",
+      "name": "If (existe cliente?)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "49d59e42-eb6a-4a0f-944a-67436a727800",
+              "name": "idBoard",
+              "value": "AARLUxg7",
+              "type": "string"
+            },
+            {
+              "id": "b1c63a7f-66d8-400f-a8a0-3701bab1015d",
+              "name": "idList",
+              "value": "69023e1110546e9beaca8cb6",
+              "type": "string"
+            },
+            {
+              "id": "09861a85-9161-454c-a79b-0ef7540ae0a2",
+              "name": "cardName",
+              "value": "={{ `${$json.nombre || 'Sin nombre'} – ${$json.intencion || 'solicitud'} – ${$json.phoneE164}` }}",
+              "type": "string"
+            },
+            {
+              "id": "69b64d17-2f7d-4c2e-8555-1125f27fc46e",
+              "name": "cardDesc",
+              "value": "={{\n`Cliente: ${$json.nombre || 'N/D'} (${$json.phoneE164 || 'N/D'})\nEmail: ${$json.email || 'N/D'}\nPaís: ${$json.pais || 'N/D'}\nCanal: ${$json.canal || 'N/D'}\nOrigen: ${$json.origen || 'N/D'}\nIntención: ${$json.intencion || 'N/D'}\nMensaje: ${$json.mensajeOriginal || 'N/D'}\nClienteID (Chatwoot): ${$json.clientId || 'N/D'}\nPrimer contacto: ${$json.primerContacto || 'N/D'}`\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        288
+      ],
+      "id": "c1d8ce47-20bb-47e0-8bad-9e440615f25d",
+      "name": "Set: Trello Card Fields"
+    },
+    {
+      "parameters": {
+        "listId": "={{$json.idList}}",
+        "name": "={{$json.cardName}}",
+        "description": "={{$json.cardDesc}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        896,
+        288
+      ],
+      "id": "3d9e7b0c-41c9-4048-b456-f54d2be7c757",
+      "name": "Trello: Card Create"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, trello_boardId, trello_listId, trello_cardId, trello_cardUrl, estado"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        288
+      ],
+      "id": "dde1c6a9-1cec-46f8-8b32-3032c1bf1ffa",
+      "name": "Clients: Set Trello Ref"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1278828-a777-4129-a2a0-49fe2cea46f7",
+              "name": "phoneE164",
+              "value": "={{ $('Clients: Upsert (Create').item.json.phoneE164 }}",
+              "type": "string"
+            },
+            {
+              "id": "f77121d0-1a88-4b07-b5a0-cf775b5284e3",
+              "name": "trello_boardId",
+              "value": "={{$node[\"Set: Trello Card Fields\"].json.idBoard}}",
+              "type": "string"
+            },
+            {
+              "id": "7254f88e-b9bd-41b5-91b3-169576578b31",
+              "name": "trello_listId",
+              "value": "={{$node[\"Set: Trello Card Fields\"].json.idList}}",
+              "type": "string"
+            },
+            {
+              "id": "5d03b468-f2cf-4c0e-bab5-d9719797a9c2",
+              "name": "=trello_cardId",
+              "value": "={{$node[\"Trello: Card Create\"].json.id}}",
+              "type": "string"
+            },
+            {
+              "id": "9d81ee9f-3c48-4972-8623-0e27ebade624",
+              "name": "trello_cardUrl",
+              "value": "={{$node[\"Trello: Card Create\"].json.shortUrl || ('https://trello.com/c/' + $node[\"Trello: Card Create\"].json.id)}}",
+              "type": "string"
+            },
+            {
+              "id": "2d259e71-9d96-43d5-abff-7b3256a631ef",
+              "name": "estado",
+              "value": "pendiente",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        288
+      ],
+      "id": "7403bb48-c1ae-453a-b21a-d775067d0430",
+      "name": "Set: Trello → Firestore"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ \n  Boolean($node[\"Clientes: Get (refresh)\"].json.trello_cardId)\n  && Boolean($json.desiredListId)\n  && $node[\"Clientes: Get (refresh)\"].json.trello_listId !== $json.desiredListId\n}}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": "",
+              "id": "a32d6616-5048-4b27-884e-5640559780c8"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7b6c17af-1346-485f-8a29-fee8c4262f79",
+      "name": "IF (puedo mover?)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        288
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": {
+          "__rl": true,
+          "value": "={{ $node[\"Clientes: Get (refresh)\"].json.trello_cardId }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "idList": "={{ $('Estado->Lista (map)').item.json.desiredListId }}",
+          "pos": "bottom"
+        }
+      },
+      "id": "c97cfbee-ac3b-4d28-a305-c742d86e74cd",
+      "name": "Trello: Card Update (move)",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        2848,
+        208
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, trello_listId, estado"
+      },
+      "id": "817a2e96-042e-4156-b885-85273444b867",
+      "name": "Clientes: Upsert (trello_listId/estado)",
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        3296,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "phoneE164",
+              "type": "string",
+              "value": "={{ $node[\"Clientes: Get (refresh)\"].json.phoneE164 }}",
+              "id": "0d14834d-d950-473d-9e6c-8dde9984b3e7"
+            },
+            {
+              "name": "trello_listId",
+              "type": "string",
+              "value": "={{ $('Estado->Lista (map)').item.json.desiredListId }}",
+              "id": "3ef147c6-c87c-44b4-b5c5-01bc553cd4c1"
+            },
+            {
+              "id": "0086896b-2e71-4462-a4ff-289872ed735a",
+              "name": "estado",
+              "value": "={{ $('Estado->Lista (map)').item.json.desiredEstado }}",
+              "type": "string"
+            },
+            {
+              "id": "03373fc1-5b65-4fbc-8f48-374e42c7611f",
+              "name": "actualizadoEn",
+              "value": "={{new Date().toISOString()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7b9a2204-6c0f-414e-ba88-56a30a1eb2cd",
+      "name": "Set payload → FB",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3072,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0851f709-1763-42a3-8b46-98c3d0c58ee2",
+              "name": "desiredEstado",
+              "value": "={{ \n  // Si es la primera interacción, pásalo a \"validando\"\n  ($json.numeroVisitas === 1) \n    ? 'validando'\n    : String($json.estado || 'pendiente')\n        .toLowerCase()\n        .normalize('NFD')\n        .replace(/\\p{Diacritic}/gu,'')\n        .trim()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "ca95cc35-9767-49b4-bb3b-0693268d4018",
+              "name": "desiredListId",
+              "value": "={{ (() => {\n  const map = {\n    pendiente:  '69023e1110546e9beaca8cb6',\n    validando:  '69023e1110546e9beaca8cb7',\n    hitl:       '69023e1110546e9beaca8cb8', // ← sin '>'\n    cotizado:   '6902417dc123e08aedcdb333',\n    entregado:  '690241826ab6c0321c1b326d'\n  };\n  const alias = {\n    'en validacion': 'validando',\n    'validacion': 'validando',\n    'en revision': 'hitl',\n    'revision': 'hitl',\n  };\n  let e = String($json.desiredEstado || $json.estado || 'pendiente')\n            .toLowerCase()\n            .normalize('NFD').replace(/\\p{Diacritic}/gu,'')\n            .trim();\n  e = alias[e] || e;\n  return map[e] || map['pendiente'];\n})() }}",
+              "type": "string"
+            },
+            {
+              "id": "03194cd6-aec7-4483-a21f-f665578790cc",
+              "name": "estadoToList",
+              "value": "={\n  pendiente:  \"69023e1110546e9beaca8cb6\",\n  validando:  \"69023e1110546e9beaca8cb7\",\n  hitl:       \"69023e1110546e9beaca8cb8\", // ojo: sin '>' al final\n  cotizado:   \"6902417dc123e08aedcdb333\",\n  entregado:  \"690241826ab6c0321c1b326d\"\n}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        288
+      ],
+      "id": "8839a531-f33d-470d-8b02-7a989c4707a2",
+      "name": "Estado->Lista (map)"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "documentId": "={{ $json.phoneE164 }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        1824,
+        288
+      ],
+      "id": "55e27d42-dd08-4b05-b84b-5ed5ee946220",
+      "name": "Clientes: Get (refresh)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "95d14dea-9f6d-44f7-ba76-45dfafbcd417",
+              "name": "estado",
+              "value": "={{ ($node[\"Clientes: Get (refresh)\"].json.numeroVisitas ?? 0) <= 1      ? 'validando'      : ($json.estado || 'pendiente') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2112,
+        288
+      ],
+      "id": "6e76f4b4-2f7b-470d-881b-81473b2d9338",
+      "name": "frozar validando"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/opt/dv-system/datasets/manifest/active_products.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        640
+      ],
+      "id": "c79b400b-3b66-4b60-b2d1-6bf184d5209b",
+      "name": "DV | Read Catalog"
+    },
+    {
+      "parameters": {
+        "jsCode": "// DV | Filter Product — tolerante a entradas y con Fallback a 5 productos\n\n// --- helper: intenta extraer `activos` desde un binario .json ---\nfunction activosFromBinary(bin) {\n  try {\n    if (!bin?.data) return null;\n    const txt = Buffer.from(bin.data, 'base64').toString('utf8');\n    const obj = JSON.parse(txt);\n    return Array.isArray(obj.activos) ? obj.activos : null;\n  } catch {\n    return null;\n  }\n}\n\n// 1) Buscar el catálogo en el item actual (después del Merge)\nlet activos = null;\nif ($binary?.catalog?.data) {\n  activos = activosFromBinary($binary.catalog);\n}\n\n// 2) Si no está, escanear el nodo \"DV | Catalog JSON\" (nombre exacto)\nif (!activos) {\n  const up = $items('DV | Catalog JSON');\n  if (up?.length) {\n    for (const it of up) {\n      // binario usual: field \"catalog\"\n      if (it.binary?.catalog?.data) {\n        activos = activosFromBinary(it.binary.catalog);\n        if (activos) break;\n      }\n      // por si ese nodo ya entregó JSON directo (raro, pero posible)\n      if (Array.isArray(it.json?.activos)) {\n        activos = it.json.activos;\n        break;\n      }\n    }\n  }\n}\n\n// 3) Si aún no, probar \"DV | Read Catalog\" (por si dejó el binario bajo otra clave)\nif (!activos) {\n  const rd = $items('DV | Read Catalog');\n  if (rd?.length) {\n    for (const it of rd) {\n      const tryBins = [it.binary?.catalog, it.binary?.data, it.binary?.file];\n      for (const b of tryBins) {\n        const a = activosFromBinary(b);\n        if (a) { activos = a; break; }\n      }\n      if (activos) break;\n    }\n  }\n}\n\n// 4) Fallback seguro para pruebas (tu “top-5” del MVP)\nif (!activos) {\n  activos = ['afiches', 'tarjetas', 'volantes', 'roller_up', 'habladores'];\n}\n\n// 5) Tomar el producto_id desde el payload de pruebas/agente\nconst pid = String($json.producto_id ?? '').trim();\n\n// 6) Evaluar\nconst allowed = pid ? activos.includes(pid) : false;\n\n// 7) Salida enriquecida\nreturn [{\n  ...$json,\n  _allowed: allowed,\n  _catalog_activos: activos\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4192,
+        640
+      ],
+      "id": "823ad480-fc7d-4fd4-8f8a-9b306539d794",
+      "name": "DV | Filter Product"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c200a5ee-1252-4790-9d06-e7bbaeae73d0",
+              "leftValue": "={{$json[\"_allowed\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4416,
+        736
+      ],
+      "id": "8333c200-0f40-4219-bda3-9793b8976ed5",
+      "name": "DV | Is Product Active:"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Producto no disponible / pasa a HITL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        4640,
+        784
+      ],
+      "id": "f95f1491-81bb-4d9e-9243-c0bdf21364ae",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "binaryPropertyName": "catalog",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3520,
+        640
+      ],
+      "id": "547e51ee-06ba-4db1-8214-1184f349e171",
+      "name": "DV | Catalog JSON"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "7T2NYIkvZ26gWOO6",
+          "mode": "list",
+          "cachedResultName": "DV-Pricing-Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        5088,
+        544
+      ],
+      "id": "ab3c1763-d0b3-4455-b676-8e5f9eaf2e65",
+      "name": "Execute Workflow"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        5312,
+        544
+      ],
+      "id": "dacb3897-c16f-4730-9cc2-12be82a44641",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Elije uno de los 5 productos permitidos para probar:\nconst pid = 'habladores'; // 'afiches' | 'tarjetas' | 'volantes' | 'roller_up' | 'habladores'\n\nfunction paramsFor(p) {\n  switch (p) {\n    case 'afiches':\n      return { tamano: '12x18_pulg', material: 'couche', cantidad: 300 };\n    case 'tarjetas':\n      return { material: 'opalina', impresion: 'tiro_y_retiro', cantidad: 100 };\n    case 'volantes':\n      return { material: 'bond_150', tamano: 'carta', impresion: 'tiro', cantidad: 150 };\n    case 'roller_up':\n      return { alto_cm: 200, ancho_cm: 85, cantidad: 1 };\n    case 'habladores':\n      return { material: 'pvc_3mm', forma_corte: 'recto', necesita_base: false, ancho_cm: 20, alto_cm: 30, cantidad: 3 };\n    default:\n      return {};\n  }\n}\n\nreturn [{\n  producto_id: pid,\n  cliente: { es_colono: false },\n  parametros: paramsFor(pid),\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3744,
+        784
+      ],
+      "id": "2d51e97a-8999-4a16-8a88-e16f7739f50c",
+      "name": "Set | Dummy Params2"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3968,
+        640
+      ],
+      "id": "096e8282-1390-4bbd-a464-1a17ee18e0e5",
+      "name": "DV | Join Params+Catalog"
+    },
+    {
+      "parameters": {
+        "options": {
+          "timezone": "America/Costa_Rica"
+        }
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        4416,
+        496
+      ],
+      "id": "6afb345f-bab6-4dc8-985b-8198bb655166",
+      "name": "Date & Time"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4640,
+        544
+      ],
+      "id": "07b47e90-fa66-4617-850e-1d46ac79c8b0",
+      "name": "DV | Join Params+Catalog1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// DV | Build Pricing Payload\n// Normaliza tipos, mapea sinónimos y arma el payload para DV-Pricing-Engine\n\nfunction normBool(v) {\n  if (typeof v === 'boolean') return v;\n  if (typeof v === 'number') return v !== 0;\n  if (typeof v === 'string') {\n    const s = v.trim().toLowerCase();\n    return ['true','1','sí','si','yes','y'].includes(s);\n  }\n  return false;\n}\n\nfunction normNum(v) {\n  if (typeof v === 'number') return v;\n  if (typeof v === 'string') return Number(v.replace(',', '.'));\n  return NaN;\n}\n\nfunction mapFormaCorte(v) {\n  const s = String(v || '').trim().toLowerCase();\n  const rectos = ['recto','recta','rectángulo','rectangular','cuadrado','frontal','straight'];\n  const irregs = ['irregular','troquel','troquelado','circular','círculo','redondo','diecut','die-cut'];\n  if (rectos.includes(s)) return 'recto';\n  if (irregs.includes(s)) return 'irregular';\n  return s || 'recto';\n}\n\nfunction reqStr(obj, key) {\n  const v = String(obj?.[key] ?? '').trim();\n  if (!v) throw new Error(`Falta '${key}'`);\n  return v;\n}\n\nfunction optStr(obj, key, def = '') {\n  const v = obj?.[key];\n  return (v === undefined || v === null) ? def : String(v);\n}\n\nconst inp = $json;\n\n// 1) Validar piezas mínimas esperadas desde el Join (o desde IA luego)\nconst producto_id = reqStr(inp, 'producto_id');\nconst es_colono = !!(inp?.cliente?.es_colono ?? false);\n\nconst p = inp?.parametros ?? {};\nconst material = reqStr(p, 'material');\nconst forma_corte = mapFormaCorte(p?.forma_corte ?? 'recto');\nconst necesita_base = normBool(p?.necesita_base ?? false);\n\nconst ancho_cm = normNum(p?.ancho_cm);\nconst alto_cm  = normNum(p?.alto_cm);\nconst cantidad = normNum(p?.cantidad);\n\nif (!Number.isFinite(ancho_cm) || ancho_cm <= 0) throw new Error('ancho_cm inválido');\nif (!Number.isFinite(alto_cm)  || alto_cm  <= 0) throw new Error('alto_cm inválido');\nif (!Number.isFinite(cantidad) || cantidad <= 0) throw new Error('cantidad inválida');\n\n// 2) Timezone y fecha\nconst tz = 'America/Costa_Rica';\nconst currentDate = inp.currentDate || inp?.meta?.currentDate || null;\n\n// 3) Catalog info (si viene del paso anterior)\nconst catalog_activos = Array.isArray(inp._catalog_activos) ? inp._catalog_activos : [];\n\n// 4) Construir payload final\nconst out = {\n  producto_id,\n  cliente: { es_colono },\n  parametros: {\n    material,\n    forma_corte,\n    necesita_base,\n    ancho_cm,\n    alto_cm,\n    cantidad,\n  },\n  meta: {\n    currentDate,\n    timezone: tz,\n    source: 'DV-Intake',\n    catalog_activos,\n  }\n};\n\n// 5) (Opcional) guard rails simples\nif (out.parametros.forma_corte === 'irregular' && /pvc/.test(material) && necesita_base === true) {\n  // solo ejemplo de regla informativa\n  out.meta.warn = 'PVC troquelado con base: validar tiempo/costo adicional';\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4864,
+        544
+      ],
+      "id": "69248d9e-de3a-4bcf-8d3e-e80f8bab8435",
+      "name": "Build Pricing Payload"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{$json.phone}}",
+        "textBody": "={{$json.text}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        576
+      ],
+      "id": "5af26822-76c2-4c0a-b0fb-37c5c55f637c",
+      "name": "Send message and wait for response",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tomamos el objeto body que viene del Webhook\nconst body = $json.body || {};\n\n// Origen principal: body.sender\n// Origen de respaldo: conversation.meta.sender\nconst name =\n  (body.sender && body.sender.name) ||\n  (body.conversation &&\n    body.conversation.meta &&\n    body.conversation.meta.sender &&\n    body.conversation.meta.sender.name) ||\n  'amigo';\n\nlet phone =\n  (body.sender && body.sender.phone_number) ||\n  (body.conversation &&\n    body.conversation.meta &&\n    body.conversation.meta.sender &&\n    body.conversation.meta.sender.phone_number) ||\n  '';\n\n// Normaliza teléfono: limpia y asegura código de país\nphone = phone.toString().trim();\n\nif (phone) {\n  const hadPlus = phone.startsWith('+');     // ¿ya venía con +?\n  phone = phone.replace(/\\D+/g, '');         // deja solo dígitos\n\n  if (hadPlus) {\n    phone = '' + phone;                     // reañade el +\n  } else {\n    phone = '' + phone;                   // ajusta a Colombia\n  }\n}\n\nconst text = `Hola ${name}, gracias por escribirnos 👋. Soy el asistente de cotizaciones.\n¿Qué producto deseas cotizar? (ej: volantes, tarjetas, etc.)`;\n\nreturn [\n  {\n    json: {\n      name,\n      phone,\n      text,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        384
+      ],
+      "id": "7050ad14-7263-4a94-9416-f334c4da320c",
+      "name": "Map to WA"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        576
+      ],
+      "id": "6bb7c06f-ae1a-447b-b240-2dcb6b0e060f",
+      "name": "WhatsApp Trigger",
+      "webhookId": "617963e0-0b35-4ca2-a322-1551cbe0fb40"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d6226bc-0c5e-45d9-974b-d8bf57906a1e",
+              "name": "origen",
+              "value": "=chatwoot",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1120,
+        192
+      ],
+      "id": "1020c492-9579-44cc-8656-9519ed70dce6",
+      "name": "Mark Source (Widget)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d6226bc-0c5e-45d9-974b-d8bf57906a1e",
+              "name": "origen",
+              "value": "=whatsapp",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1120,
+        576
+      ],
+      "id": "82ee7353-9c0a-4862-998c-c95a4f307819",
+      "name": "Mark Source (WhatsApp)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "843ffa24-120e-4230-adf2-ecf21789d14f",
+              "leftValue": "={{ $('Edit Fields').item.json.origen }}",
+              "rightValue": "chatwoot",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        576
+      ],
+      "id": "08656291-8101-4f48-95ef-e5c2fe6314f5",
+      "name": "If (origen chatwoot?)"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "dv_intake_sessions",
+        "documentId": "={{ $json.phoneE164 }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        832
+      ],
+      "id": "b8f2dd44-b30f-4e40-8feb-5ee1a5cbe973",
+      "name": "Session: Get",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a6ed8069-e796-4a28-922a-5cd83b56c110",
+              "leftValue": "={{ $node[\"Session: Get\"].json._id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        832
+      ],
+      "id": "e108aa1c-5062-44d2-a81c-8091786bccad",
+      "name": "If (tiene sesión?)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a408308c-af42-4107-ac2f-caa00450c621",
+              "name": "phoneE164",
+              "value": "={{ $node[\"Restore Intake Context\"].json.phoneE164 }}",
+              "type": "string"
+            },
+            {
+              "id": "01567907-66ec-4dc0-94fc-5039985e6985",
+              "name": "stage",
+              "value": "=ask_nombre",
+              "type": "string"
+            },
+            {
+              "id": "bf4d6c0a-50c6-41b9-9aed-57883bd89f83",
+              "name": "createdAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "44b0839d-b967-488a-9af4-e817961e4925",
+              "name": "updatedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        576
+      ],
+      "id": "4c0a6f86-c4e3-4747-83cc-a09fca2f3299",
+      "name": "Session: Init"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "dv_intake_sessions",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, stage, createdAt, updatedAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        1392,
+        576
+      ],
+      "id": "e7995940-22fe-473c-ae06-27eae69a4826",
+      "name": "Clients: Upsert (Create1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "49d59e42-eb6a-4a0f-944a-67436a727800",
+              "name": "idBoard",
+              "value": "AARLUxg7",
+              "type": "string"
+            },
+            {
+              "id": "b1c63a7f-66d8-400f-a8a0-3701bab1015d",
+              "name": "idList",
+              "value": "69023e1110546e9beaca8cb7",
+              "type": "string"
+            },
+            {
+              "id": "09861a85-9161-454c-a79b-0ef7540ae0a2",
+              "name": "cardName",
+              "value": "={{ `${$json.nombre || 'Sin nombre'} – ${$json.intencion || 'solicitud'} – ${$json.phoneE164}` }}",
+              "type": "string"
+            },
+            {
+              "id": "69b64d17-2f7d-4c2e-8555-1125f27fc46e",
+              "name": "cardDesc",
+              "value": "={{`\nCliente: ${$json.nombre || 'N/D'} (${$json.phoneE164 || 'N/D'})\nEmail: ${$json.email || 'N/D'}\nOrigen: ${$node[\"Restore Intake Context\"].json.origen || 'N/D'}\nIntención: ${$node[\"Restore Intake Context\"].json.intencion || 'N/D'}\nMensaje: ${$node[\"Restore Intake Context\"].json.mensajeOriginal || 'N/D'}\n`}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3280,
+        1424
+      ],
+      "id": "e007e69f-0463-4049-a628-5e3be767c2de",
+      "name": "Set: Trello Card Fields1"
+    },
+    {
+      "parameters": {
+        "listId": "={{$json.idList}}",
+        "name": "={{$json.cardName}}",
+        "description": "={{$json.cardDesc}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        3504,
+        1424
+      ],
+      "id": "bedbdcd9-3991-450e-a878-68a3e374a8b9",
+      "name": "Trello: Card Create1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, trello_boardId, trello_listId, trello_cardId, trello_cardUrl, estado"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        1424
+      ],
+      "id": "0e90cfc3-3497-467b-bb79-2bc506c8d621",
+      "name": "Clients: Set Trello Ref1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1278828-a777-4129-a2a0-49fe2cea46f7",
+              "name": "phoneE164",
+              "value": "={{ $('Client: Build Record').item.json.phoneE164 }}",
+              "type": "string"
+            },
+            {
+              "id": "f77121d0-1a88-4b07-b5a0-cf775b5284e3",
+              "name": "trello_boardId",
+              "value": "={{$node[\"Set: Trello Card Fields1\"].json.idBoard}}",
+              "type": "string"
+            },
+            {
+              "id": "7254f88e-b9bd-41b5-91b3-169576578b31",
+              "name": "trello_listId",
+              "value": "={{$node[\"Set: Trello Card Fields1\"].json.idList}}",
+              "type": "string"
+            },
+            {
+              "id": "5d03b468-f2cf-4c0e-bab5-d9719797a9c2",
+              "name": "=trello_cardId",
+              "value": "={{$node[\"Trello: Card Create1\"].json.id}}",
+              "type": "string"
+            },
+            {
+              "id": "9d81ee9f-3c48-4972-8623-0e27ebade624",
+              "name": "trello_cardUrl",
+              "value": "={{$node[\"Trello: Card Create1\"].json.shortUrl || ('https://trello.com/c/' + $node[\"Trello: Card Create1\"].json.id)}}",
+              "type": "string"
+            },
+            {
+              "id": "2d259e71-9d96-43d5-abff-7b3256a631ef",
+              "name": "estado",
+              "value": "validando",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3728,
+        1424
+      ],
+      "id": "8a86e03e-8925-4c80-90a7-876e44c20e7f",
+      "name": "Set: Trello → Firestore1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ \n  Boolean($node[\"Clientes: Get (refresh)1\"].json.trello_cardId)\n  && Boolean($json.desiredListId)\n  && $node[\"Clientes: Get (refresh)1\"].json.trello_listId !== $json.desiredListId\n}}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": "",
+              "id": "a32d6616-5048-4b27-884e-5640559780c8"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1614992a-afb1-41c5-b927-cb6ba01175f6",
+      "name": "IF (puedo mover?)1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4848,
+        1424
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": {
+          "__rl": true,
+          "value": "={{ $node[\"Clientes: Get (refresh)1\"].json.trello_cardId }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "idList": "={{ $('Estado->Lista (map)1').item.json.desiredListId }}",
+          "pos": "bottom"
+        }
+      },
+      "id": "792a7120-ae04-43dc-8764-5ecbfc0b0abf",
+      "name": "Trello: Card Update (move)1",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        5072,
+        880
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, trello_listId, estado"
+      },
+      "id": "15a7ca04-3614-40c7-b87b-06e88cceb0e7",
+      "name": "Clientes: Upsert (trello_listId/estado)1",
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        5520,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "phoneE164",
+              "type": "string",
+              "value": "={{ $node[\"Clientes: Get (refresh)1\"].json.phoneE164 }}",
+              "id": "0d14834d-d950-473d-9e6c-8dde9984b3e7"
+            },
+            {
+              "name": "trello_listId",
+              "type": "string",
+              "value": "={{ $('Estado->Lista (map)1').item.json.desiredListId }}",
+              "id": "3ef147c6-c87c-44b4-b5c5-01bc553cd4c1"
+            },
+            {
+              "id": "0086896b-2e71-4462-a4ff-289872ed735a",
+              "name": "estado",
+              "value": "={{ $('Estado->Lista (map)1').item.json.desiredEstado }}",
+              "type": "string"
+            },
+            {
+              "id": "03373fc1-5b65-4fbc-8f48-374e42c7611f",
+              "name": "actualizadoEn",
+              "value": "={{new Date().toISOString()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ba45b620-748a-465f-9c64-b7b733b9cf7d",
+      "name": "Set payload → FB1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5296,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0851f709-1763-42a3-8b46-98c3d0c58ee2",
+              "name": "desiredEstado",
+              "value": "={{ \n  // Si es la primera interacción, pásalo a \"validando\"\n  ($json.numeroVisitas === 1) \n    ? 'validando'\n    : String($json.estado || 'pendiente')\n        .toLowerCase()\n        .normalize('NFD')\n        .replace(/\\p{Diacritic}/gu,'')\n        .trim()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "ca95cc35-9767-49b4-bb3b-0693268d4018",
+              "name": "desiredListId",
+              "value": "=const map = {\n  validando: '69023e1110546e9beaca8cb7',\n  hitl:      '69023e1110546e9beaca8cb8',\n  cotizado:  '6902417dc123e08aedcdb333',\n  entregado: '690241826ab6c0321c1b326d'\n};\n...\nreturn map[e] || map['pendiente'];",
+              "type": "string"
+            },
+            {
+              "id": "03194cd6-aec7-4483-a21f-f665578790cc",
+              "name": "estadoToList",
+              "value": "={\n  validando:  \"69023e1110546e9beaca8cb7\",\n  hitl:       \"69023e1110546e9beaca8cb8\", // ojo: sin '>' al final\n  cotizado:   \"6902417dc123e08aedcdb333\",\n  entregado:  \"690241826ab6c0321c1b326d\"\n}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4624,
+        1424
+      ],
+      "id": "8cf1c43e-d82f-469b-ac51-8db6c1d4902e",
+      "name": "Estado->Lista (map)1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "documentId": "={{ $json.phoneE164 }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        4176,
+        1424
+      ],
+      "id": "aad4e2ed-d9e9-443d-bacd-f597cd012048",
+      "name": "Clientes: Get (refresh)1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "95d14dea-9f6d-44f7-ba76-45dfafbcd417",
+              "name": "estado",
+              "value": "={{ ($node[\"Clientes: Get (refresh)1\"].json.numeroVisitas ?? 0) <= 1      ? 'validando'      : ($json.estado || 'pendiente') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4400,
+        1424
+      ],
+      "id": "5e751ce1-887a-47f3-b97d-6f674b82feec",
+      "name": "frozar validando1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Contexto:\n- Canal: WhatsApp.\n- Aún no tenemos datos del cliente (nombre ni correo).\n- Tenemos solo su número de teléfono y su primer mensaje.\n- stage actual en la sesión = \"ask_nombre\" (estamos en la etapa de pedir nombre).\n\nInstrucción:\nEscribe UN SOLO mensaje corto en español para WhatsApp:\n- Preséntate como el asistente de cotizaciones de una imprenta.\n- Agradece por escribir.\n- Pide el NOMBRE COMPLETO del cliente en una sola pregunta clara.\n- Tono cordial, cercano y profesional.\n- No digas que eres una IA.\n- No pidas más datos todavía (solo el nombre).\n- No uses listas, solo texto plano.\n\nResponde únicamente con el texto del mensaje, nada más.\n",
+        "options": {
+          "systemMessage": "Eres un asistente de intake de clientes para un sistema de cotizaciones de impresión (DV Intake).\nTu trabajo es guiar al usuario paso a paso para registrar sus datos.\nEn esta etapa solo debes pedir el nombre, de forma amable y directa.\nNunca expliques el funcionamiento interno del sistema.\nSiempre responde en español.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        576
+      ],
+      "id": "b5478081-204f-4775-a896-0cd4d0c58b0e",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        800
+      ],
+      "id": "0dbb6c48-4159-46fa-bc29-d5b41604abaf",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f7fc63d-c249-465d-9bbc-2ebd7a599f62",
+              "name": "phoneE164",
+              "value": "={{$node[\"Edit Fields\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "233856ad-ec98-4470-af55-e5cd76555c34",
+              "name": "origen",
+              "value": "={{$node[\"Edit Fields\"].json.origen}}",
+              "type": "string"
+            },
+            {
+              "id": "ab9fb08a-edad-4d26-a092-bdd4a3e78900",
+              "name": "mensajeOriginal",
+              "value": "={{$node[\"Edit Fields\"].json.mensajeOriginal}}",
+              "type": "string"
+            },
+            {
+              "id": "d9430c2f-dbc5-43a1-969f-047fed1a6c88",
+              "name": "intencion",
+              "value": "={{$node[\"Edit Fields\"].json.intencion}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        832
+      ],
+      "id": "d793fa89-1cc4-45f9-98de-37fd03b3731a",
+      "name": "Restore Intake Context"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "44702e72-9c2b-4f00-9889-2fbb556adeb9",
+              "name": "=phone",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "77400cf4-8fd0-416e-933b-2ba54d78c2a9",
+              "name": "text",
+              "value": "={{$json.output}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        576
+      ],
+      "id": "60613720-e0c8-45d0-b460-358269000381",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{$json.phone}}",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {
+          "previewUrl": false
+        }
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        576
+      ],
+      "id": "f4dae7d7-1609-4e98-a39e-463a87118a1f",
+      "name": "Send message and wait for response1",
+      "webhookId": "926ad742-b537-4284-86b6-78f272ca91ef"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "ask_nombre",
+                    "rightValue": "={{$node[\"Session: Get\"].json.stage || \"\"}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "89f7224f-175e-4ed2-ab45-650e514b1988"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ask_nombre"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4f8bc267-0338-4ad9-b3a6-d722451a4c22",
+                    "leftValue": "ask_email",
+                    "rightValue": "={{$node[\"Session: Get\"].json.stage || \"\"}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ask_email"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "de1ea3c1-19eb-4a12-a751-e103662ee96c",
+                    "leftValue": "ready_client",
+                    "rightValue": "={{$node[\"Session: Get\"].json.stage || \"\"}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ready_client"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1104,
+        1008
+      ],
+      "id": "5153c089-dfee-4eaf-a91c-e663a564a91b",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1184
+      ],
+      "id": "57e03521-3730-4833-b855-9adec80cc974",
+      "name": "Google Gemini Chat Model1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Mensaje del cliente en WhatsApp:\n\"{{ $('Edit Fields').item.json.messages[0].text.body }}\"\n\nInstrucción:\n- Extrae el NOMBRE COMPLETO de la persona a partir de ese mensaje.\n- Devuélvelo solo en formato texto, sin comillas, sin saludos, sin nada adicional.\n- Si el mensaje no contiene un nombre razonable, responde exactamente: ASK_AGAIN\n\n",
+        "options": {
+          "systemMessage": "Eres un asistente que solo se encarga de limpiar y normalizar nombres de personas\na partir de mensajes de WhatsApp. \n\nSiempre:\n- Devuelves solo el nombre completo (ej: \"Juan Carlos Pérez\").\n- No añades texto extra.\n- Si no encuentras un nombre, devuelves exactamente \"ASK_AGAIN\".\n- Respondes en español."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        960
+      ],
+      "id": "0329c88b-290c-48e4-938b-997bdc3b0c4a",
+      "name": "AI Agent – Nombre"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4db9a54d-146a-4db6-9796-c22db0f89837",
+              "name": "phoneE164",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "f02c4dfa-6449-4da0-b618-c035d9c1e8b1",
+              "name": "nombre",
+              "value": "={{$json.output}}",
+              "type": "string"
+            },
+            {
+              "id": "856307ec-b7c9-41d8-8181-48e0519e47ea",
+              "name": "stage",
+              "value": "=ask_email",
+              "type": "string"
+            },
+            {
+              "id": "6e40959b-f7e7-4601-b9ea-1bc2c6f61da0",
+              "name": "updatedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1744,
+        1072
+      ],
+      "id": "f57cd8c4-9079-41c3-98bd-8df3c1b5efbe",
+      "name": "Session: Update Nombre"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "dv_intake_sessions",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, nombre, stage, updatedAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        2032,
+        1072
+      ],
+      "id": "6226fe59-81e1-46f9-8d7f-fafd5fe12959",
+      "name": "Session: Upsert Nombre"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        1184
+      ],
+      "id": "dfd01ef3-ebd3-4056-a601-6e9fa2785f47",
+      "name": "Google Gemini Chat Model2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Contexto:\n- Canal: WhatsApp.\n- Ya tenemos el nombre del cliente: \"{{ $node[\"Session: Update Nombre\"].json.nombre }}\".\n- Vamos a pedirle su CORREO electrónico.\n- stage actual en la sesión = \"ask_email\".\n\nInstrucción:\nEscribe UN SOLO mensaje corto en español para WhatsApp:\n- Saluda usando el nombre del cliente si es posible.\n- Confirma de forma amable que registramos su nombre.\n- Pide su correo electrónico en una sola pregunta clara.\n- Tono cordial, cercano y profesional.\n- No digas que eres una IA.\n- No uses listas, solo texto plano.\n\nResponde únicamente con el texto del mensaje, nada más.",
+        "options": {
+          "systemMessage": "Eres un asistente de intake de clientes para DV Intake.\nTu trabajo es guiar al usuario paso a paso para registrar sus datos.\nEn esta etapa solo debes pedir el correo electrónico, de forma amable y directa.\nNunca expliques el funcionamiento interno del sistema.\nSiempre responde en español.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        960
+      ],
+      "id": "a0cfe007-9f90-40b0-a3ef-ba484809398b",
+      "name": "AI Agent – Email"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "44702e72-9c2b-4f00-9889-2fbb556adeb9",
+              "name": "=phone",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "77400cf4-8fd0-416e-933b-2ba54d78c2a9",
+              "name": "text",
+              "value": "={{$json.output}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2608,
+        1072
+      ],
+      "id": "899cc8e3-3a9d-4224-9e54-e1a7b603b7a9",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{$json.phone}}",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2832,
+        1072
+      ],
+      "id": "e416b379-2b48-4b1d-83d4-623cb71f6b99",
+      "name": "Send message and wait for response2",
+      "webhookId": "926ad742-b537-4284-86b6-78f272ca91ef"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1744
+      ],
+      "id": "900fe2db-088f-4fb8-a694-cc25a0cb93ad",
+      "name": "Google Gemini Chat Model3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Mensaje del cliente en WhatsApp:\n\"{{ $node[\"Restore Intake Context\"].json.mensajeOriginal }}\"\n\nInstrucción:\n- Extrae el CORREO electrónico de ese mensaje.\n- Devuélvelo solo en formato texto (ej: \"correo@ejemplo.com\"), sin comillas ni texto adicional.\n- Si el mensaje no contiene un correo razonable, responde exactamente: ASK_AGAIN_EMAIL",
+        "options": {
+          "systemMessage": "Eres un asistente que solo se encarga de limpiar y normalizar correos\nelectrónicos a partir de mensajes de WhatsApp.\n\nSiempre:\n- Devuelves solo el correo (ej: \"correo@ejemplo.com\").\n- No añades texto extra.\n- Si no encuentras un correo, devuelves exactamente \"ASK_AGAIN_EMAIL\".\n- Respondes en español."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        1520
+      ],
+      "id": "b88de80b-6ce3-4f73-a4c5-8353c2aa6dbc",
+      "name": "AI Agent – Email Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "44702e72-9c2b-4f00-9889-2fbb556adeb9",
+              "name": "=phone",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "77400cf4-8fd0-416e-933b-2ba54d78c2a9",
+              "name": "text",
+              "value": "={{$json.output}}",
+              "type": "string"
+            },
+            {
+              "id": "beb5e1d6-fb07-47fb-b307-2a8ec74533f3",
+              "name": "respuesta",
+              "value": "Por favor verifica si tu correo electronico tiene el formato correcto, y vuelve a enviarnos el correo por favor.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1616
+      ],
+      "id": "e9d411c4-b8f5-49c5-9d7e-85bca372c0f7",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{$json.phone}}",
+        "textBody": "={{ $json.respuesta }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        1616
+      ],
+      "id": "950f1999-a0f0-4ad5-9206-52f1703e7f88",
+      "name": "Send message and wait for response3",
+      "webhookId": "926ad742-b537-4284-86b6-78f272ca91ef"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c4b6d346-6fd9-4da3-9753-036cbbacecd2",
+              "leftValue": "={{ $json.output || '' }}",
+              "rightValue": "ASK_AGAIN_EMAIL",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        1520
+      ],
+      "id": "9ae9612b-fe7e-4dee-8708-78e3340cc74f",
+      "name": "If (email válido?)1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4db9a54d-146a-4db6-9796-c22db0f89837",
+              "name": "phoneE164",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "f02c4dfa-6449-4da0-b618-c035d9c1e8b1",
+              "name": "email",
+              "value": "={{$json.output}}",
+              "type": "string"
+            },
+            {
+              "id": "856307ec-b7c9-41d8-8181-48e0519e47ea",
+              "name": "stage",
+              "value": "=ready_client",
+              "type": "string"
+            },
+            {
+              "id": "6e40959b-f7e7-4601-b9ea-1bc2c6f61da0",
+              "name": "updatedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "38cdd765-7b6c-4702-b507-6c2420ac5391",
+              "name": "nombre",
+              "value": "={{ $('If (tiene sesión?)').item.json.nombre }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1424
+      ],
+      "id": "f4e98c8a-8f82-44b7-b2ac-f2ab85d8d796",
+      "name": "ready_client1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "dv_intake_sessions",
+        "updateKey": "phoneE164",
+        "columns": "phoneE164, email, stage, updatedAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        2320,
+        1424
+      ],
+      "id": "4e759a16-68db-462d-8ff9-1eb26a51d59e",
+      "name": "Session: Upsert Email1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "=phoneE164",
+        "columns": "phoneE164, nombre, email,_Id, createdAt,updateAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        1392,
+        768
+      ],
+      "id": "1fd0712e-c0c7-4dea-8176-6de38461479a",
+      "name": "Clients: Upsert (Update)2"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{ $json.phoneE164 }}",
+        "textBody": "=¡Perfecto {{ $json.nombre }}., Te has Registrado Satisfactoriamnete, ya puedes hacer uso de nuestro agente inteligente.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        1424
+      ],
+      "id": "5c382238-32c7-4af9-a80c-43578a605ec0",
+      "name": "Send message and wait for response4",
+      "webhookId": "926ad742-b537-4284-86b6-78f272ca91ef"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "=phoneE164",
+        "columns": "phoneE164, nombre, email, createdAt, updatedAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        3056,
+        1424
+      ],
+      "id": "27e93533-7b9e-435d-9236-9b8318d5cef4",
+      "name": "Client: Build Record"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4db9a54d-146a-4db6-9796-c22db0f89837",
+              "name": "phoneE164",
+              "value": "={{$node[\"Restore Intake Context\"].json.phoneE164}}",
+              "type": "string"
+            },
+            {
+              "id": "f02c4dfa-6449-4da0-b618-c035d9c1e8b1",
+              "name": "email",
+              "value": "={{ $node[\"ready_client1\"].json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "856307ec-b7c9-41d8-8181-48e0519e47ea",
+              "name": "stage",
+              "value": "=ready_client",
+              "type": "string"
+            },
+            {
+              "id": "6e40959b-f7e7-4601-b9ea-1bc2c6f61da0",
+              "name": "updatedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "38cdd765-7b6c-4702-b507-6c2420ac5391",
+              "name": "nombre",
+              "value": "={{ $('If (tiene sesión?)').item.json.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "e7ce5ed1-f84c-43b6-bb1b-a4aa4ad5d81a",
+              "name": "createdAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2832,
+        1424
+      ],
+      "id": "791effc3-c7a3-495b-bff5-58af1388f6d1",
+      "name": "Client: Build Payload"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "RsEmq9YQNRA27UVI",
+          "mode": "list",
+          "cachedResultName": "DV-Intake-Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b1c07db3-c063-4300-891a-eb52390f2686",
+      "name": "Execute Workflow1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -448,
+        384
+      ],
+      "id": "53c6e1e8-1456-49de-937b-fd11211e6f4a",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{$json.phoneE164}}",
+        "textBody": "={{ $json.texto_htl }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        2032
+      ],
+      "id": "9e80f25c-ad7d-4fee-bb5b-bd02940f0fb4",
+      "name": "Send message to HTL",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{ $json.phoneE164 || $json.phone || $json.meta.wa_from }}",
+        "messageType": "image",
+        "mediaPath": "useMedian8n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        2224
+      ],
+      "id": "b0da867b-f134-45ac-b10d-5fdfdc65dd0b",
+      "name": "Send message to HTL4",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "41988e31-bafd-4508-96ef-56af54a1ae3c",
+              "leftValue": "={{ $json.message.photo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1120,
+        2128
+      ],
+      "id": "d6382b08-88dd-4bfd-8a0b-a1c5f6b3e61c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{$json[\"message\"][\"photo\"][1][\"file_id\"]}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -896,
+        2224
+      ],
+      "id": "e5d9c83a-7e56-4788-bbd5-0af55e270cc9",
+      "name": "Get a file",
+      "webhookId": "355a507b-834f-4b12-a631-fdadb4b04515"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    phoneE164: '573237451221', // si lo pasas por metadatos o variables\n    from: 'human',\n    source: 'telegram',\n    step: 'htl',\n    text: $json.message?.text || '',\n    t: new Date().toISOString(),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        1840
+      ],
+      "id": "38bdc09e-39c4-42fb-8be9-9426304ae30e",
+      "name": "mepeo HTL"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "projectId": "dv-system-6aade",
+        "collection": "={{ 'clientes/' + $json.phoneE164 + '/logs' }}",
+        "documentId": "={{ $json.msg_id || Date.now().toString() }}",
+        "columns": "phoneE164, from, source, step, text, t"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        1840
+      ],
+      "id": "e329d4a6-62ba-4ef8-8d62-f298a7246260",
+      "name": "create log HTL"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1344,
+        2032
+      ],
+      "id": "04230f31-e83c-4bb7-853f-1ab8ca798d6b",
+      "name": "Telegram Trigger",
+      "webhookId": "396bbfe8-5147-4f32-8397-2a92ddc9499f"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "=htl_sessions",
+        "documentId": "=undefined"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        2032
+      ],
+      "id": "332356d8-6ad8-4a57-bbfe-c03aab4770c4",
+      "name": "Get Sessions1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build WA Reply v1\n// Entra el JSON del Get Document de Firestore\n// y necesitamos también el texto del asesor en Telegram\n\nconst telegramMsg = $items('Telegram Trigger')[0].json.message;\nconst session     = $json; // lo que devolvió Firestore\n\nreturn [{\n  json: {\n    phoneE164: session.phoneE164,\n    nombre: session.nombre,\n    texto_htl: telegramMsg.text,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        2032
+      ],
+      "id": "1f15476b-712f-49f9-9b86-5d10ec3fa029",
+      "name": "Get HTL Session1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6d8f811a-d7d8-45d6-aae3-1b45b6fc2859",
+              "leftValue": "={{$node[\"Edit Fields\"].json.phoneE164}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        928
+      ],
+      "id": "3e4b3500-e17b-4f98-8d90-aba842d9899c",
+      "name": "If (numero no null?)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Clients: Get by ID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "DV IDs & Times": {
+      "main": [
+        [
+          {
+            "node": "Clients: Upsert (Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Upsert (Create": {
+      "main": [
+        [
+          {
+            "node": "DV Log (Set – Create)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set: Trello Card Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logs: Create1": {
+      "main": [
+        [
+          {
+            "node": "verifcar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV Log (Set – Create)": {
+      "main": [
+        [
+          {
+            "node": "Logs: Create1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Get by ID": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Map to WA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Source (Widget)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (existe cliente?)": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If (origen chatwoot?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Trello Card Fields": {
+      "main": [
+        [
+          {
+            "node": "Trello: Card Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trello: Card Create": {
+      "main": [
+        [
+          {
+            "node": "Set: Trello → Firestore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Set Trello Ref": {
+      "main": [
+        [
+          {
+            "node": "Clientes: Get (refresh)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Trello → Firestore": {
+      "main": [
+        [
+          {
+            "node": "Clients: Set Trello Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF (puedo mover?)": {
+      "main": [
+        [
+          {
+            "node": "Trello: Card Update (move)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set payload → FB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trello: Card Update (move)": {
+      "main": [
+        [
+          {
+            "node": "Set payload → FB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set payload → FB": {
+      "main": [
+        [
+          {
+            "node": "Clientes: Upsert (trello_listId/estado)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DV | Read Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estado->Lista (map)": {
+      "main": [
+        [
+          {
+            "node": "IF (puedo mover?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clientes: Get (refresh)": {
+      "main": [
+        [
+          {
+            "node": "frozar validando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "frozar validando": {
+      "main": [
+        [
+          {
+            "node": "Estado->Lista (map)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Read Catalog": {
+      "main": [
+        [
+          {
+            "node": "DV | Catalog JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Filter Product": {
+      "main": [
+        [
+          {
+            "node": "DV | Is Product Active:",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Is Product Active:": {
+      "main": [
+        [
+          {
+            "node": "DV | Join Params+Catalog1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Catalog JSON": {
+      "main": [
+        [
+          {
+            "node": "DV | Join Params+Catalog",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Set | Dummy Params2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set | Dummy Params2": {
+      "main": [
+        [
+          {
+            "node": "DV | Join Params+Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Join Params+Catalog": {
+      "main": [
+        [
+          {
+            "node": "DV | Filter Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "DV | Join Params+Catalog1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "DV | Join Params+Catalog1": {
+      "main": [
+        [
+          {
+            "node": "Build Pricing Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Pricing Payload": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map to WA": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Mark Source (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Source (Widget)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Source (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (origen chatwoot?)": {
+      "main": [
+        [
+          {
+            "node": "DV IDs & Times",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore Intake Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session: Get": {
+      "main": [
+        [
+          {
+            "node": "If (numero no null?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (tiene sesión?)": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Session: Init",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Upsert (Create1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Trello Card Fields1": {
+      "main": [
+        [
+          {
+            "node": "Trello: Card Create1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trello: Card Create1": {
+      "main": [
+        [
+          {
+            "node": "Set: Trello → Firestore1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Set Trello Ref1": {
+      "main": [
+        [
+          {
+            "node": "Clientes: Get (refresh)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Trello → Firestore1": {
+      "main": [
+        [
+          {
+            "node": "Clients: Set Trello Ref1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF (puedo mover?)1": {
+      "main": [
+        [
+          {
+            "node": "Trello: Card Update (move)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set payload → FB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trello: Card Update (move)1": {
+      "main": [
+        [
+          {
+            "node": "Set payload → FB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set payload → FB1": {
+      "main": [
+        [
+          {
+            "node": "Clientes: Upsert (trello_listId/estado)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estado->Lista (map)1": {
+      "main": [
+        [
+          {
+            "node": "IF (puedo mover?)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clientes: Get (refresh)1": {
+      "main": [
+        [
+          {
+            "node": "frozar validando1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "frozar validando1": {
+      "main": [
+        [
+          {
+            "node": "Estado->Lista (map)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session: Init": {
+      "main": [
+        [
+          {
+            "node": "Clients: Upsert (Create1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Intake Context": {
+      "main": [
+        [
+          {
+            "node": "Session: Get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "AI Agent – Nombre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent – Email Parser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clients: Upsert (Update)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent – Nombre",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent – Nombre": {
+      "main": [
+        [
+          {
+            "node": "Session: Update Nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session: Update Nombre": {
+      "main": [
+        [
+          {
+            "node": "Session: Upsert Nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent – Email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session: Upsert Nombre": {
+      "main": [
+        [
+          {
+            "node": "AI Agent – Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent – Email": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent – Email Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (email válido?)1": {
+      "main": [
+        [
+          {
+            "node": "ready_client1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ready_client1": {
+      "main": [
+        [
+          {
+            "node": "Session: Upsert Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent – Email Parser": {
+      "main": [
+        [
+          {
+            "node": "If (email válido?)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session: Upsert Email1": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response4": {
+      "main": [
+        [
+          {
+            "node": "Client: Build Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client: Build Payload": {
+      "main": [
+        [
+          {
+            "node": "Client: Build Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client: Build Record": {
+      "main": [
+        [
+          {
+            "node": "Set: Trello Card Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "If (existe cliente?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get Sessions1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Send message to HTL4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mepeo HTL": {
+      "main": [
+        [
+          {
+            "node": "create log HTL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "mepeo HTL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sessions1": {
+      "main": [
+        [
+          {
+            "node": "Get HTL Session1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get HTL Session1": {
+      "main": [
+        [
+          {
+            "node": "Send message to HTL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (numero no null?)": {
+      "main": [
+        [
+          {
+            "node": "If (tiene sesión?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9dc26666-ed64-4e7c-9c5b-7f534fe0e0f6",
+  "meta": {
+    "instanceId": "74de3f40f7dd03281c209a774f4ef3a825dc9bed1d417945c83acb6aabc41861"
+  },
+  "id": "FRBgWMtz0HsKfbcM",
+  "tags": []
+}

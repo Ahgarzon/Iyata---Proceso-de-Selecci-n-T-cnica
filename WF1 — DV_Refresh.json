@@ -1,0 +1,485 @@
+{
+  "name": "WF1 — DV_Refresh",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dv/refresh",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ba61d779-f414-427c-b7a5-f85686984cc2",
+      "name": "Webhook /dv/refresh",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1504,
+        272
+      ],
+      "webhookId": "ca35b048-4c76-49c4-aaa6-ca37ea638ab2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a2166ed5-ca91-4cb9-95e3-c362e5e60a97",
+      "name": "Respond JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        64,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/opt/dv-system/datasets/staging/precios_diseno.json",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "b9164a04-9162-4ed0-af1d-64eb5cffee69",
+      "name": "Write → /datasets/staging/precios_diseno.json",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit?gid=1683588253#gid=1683588253",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1764326626,
+          "mode": "list",
+          "cachedResultName": "Volantes",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit#gid=1764326626"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1248,
+        160
+      ],
+      "id": "22f678c6-2549-40c5-99e3-6bffa0b1b5f3",
+      "name": "Sheets → Read (whitelist)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6vq1qUf3TX0KrJo6",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n → Function node: “Normalize + Build payload”\n// Mode: Run Once for All Items\n\n// 1) Toma TODOS los items que vienen del Merge (una fila por registro)\nconst rows = $input.all().map(i => i.json || {}).filter(r => Object.keys(r).length);\n\n// 2) Metadatos (ajústalos si quieres)\nconst meta = {\n  version: new Date().toISOString().split('T')[0],\n  moneda: 'CRC',\n  iva: 0.13,\n  descripcion: \"Tabla generada desde Sheets → staging (filas crudas) + normalized (encabezado + filas).\"\n};\n\n// 3) Normalizado “compatible” con el motor: encabezado + items\n//    (de momento ponemos las filas tal cual en 'items'; el mapeo a IDs finales\n//     del motor se puede añadir después sin romper nada)\nconst normalized = { ...meta, items: rows };\n\n// 4) Salida única con dos propiedades para los siguientes nodos\n//    - toBinary(normalized) usará $json.normalized\n//    - toBinary(data)       usará $json.data\nreturn [\n  {\n    json: {\n      normalized,\n      data: rows\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        224
+      ],
+      "id": "7be22d7f-d820-4925-8393-c832a29d6e7a",
+      "name": "Normalize + Build payload"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit?gid=1683588253#gid=1683588253",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1354629040,
+          "mode": "list",
+          "cachedResultName": "Afiches",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit#gid=1354629040"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1248,
+        336
+      ],
+      "id": "ba3375f4-e57b-4695-90aa-73842a4f3c47",
+      "name": "Sheets → Read (whitelist)1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6vq1qUf3TX0KrJo6",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit?gid=1683588253#gid=1683588253",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 907329735,
+          "mode": "list",
+          "cachedResultName": "Talonarios",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit#gid=907329735"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1232,
+        528
+      ],
+      "id": "4fba11a7-7d02-4cc4-ae36-3f50ff149973",
+      "name": "Sheets → Read (whitelist)2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6vq1qUf3TX0KrJo6",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit?gid=1683588253#gid=1683588253",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683588253,
+          "mode": "list",
+          "cachedResultName": "Tarjetas de presentación",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1b8o1Lq2MQaE15WRQYyy-sDIBpDNkedwc7TNGqHJ0oJU/edit#gid=1683588253"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1216,
+        720
+      ],
+      "id": "7381ce67-1911-47a8-8d27-27a8a787204b",
+      "name": "Sheets → Read (whitelist)3",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6vq1qUf3TX0KrJo6",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1008,
+        352
+      ],
+      "id": "82c1a8ab-859b-474f-8c45-da9870ed1e1b",
+      "name": "Merge Sheets"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "46644c88-308e-4292-8fb7-a6f3a479620f",
+              "name": "writeRequested",
+              "value": "={{$item(0).$node[\"Webhook /dv/refresh\"].json[\"write\"] === true}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f013cc0a-3666-490e-84b6-fd9f0d2f0ec6",
+      "name": "writeRequested"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fbbcc435-0131-4055-a132-7b778277f9d1",
+              "leftValue": "={{$json[\"writeRequested\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -336,
+        272
+      ],
+      "id": "01a4ba45-9712-496f-be66-e78574ab60c4",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convierte json.file.content (string) a binario 'data' para WriteBinaryFile\nconst path = $json.file?.path || '/opt/dv-system/datasets/staging/precios_diseno.json';\nconst content = String($json.file?.content ?? '');\n\nreturn [{\n  json: {\n    // devolvemos lo mismo para que Respond JSON siga mostrando stats, etc.\n    ...$json,\n  },\n  binary: {\n    data: {\n      // Write Binary File espera base64 en .data\n      data: Buffer.from(content, 'utf8').toString('base64'),\n      fileName: path.split('/').pop(),\n      mimeType: 'application/json',\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        448
+      ],
+      "id": "1a9849bd-6530-4077-a738-29c3001ce627",
+      "name": "toBinary(data)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const path = '/home/node/.n8n/files/dv-system/normalized/precios_diseno.json';\nconst content = JSON.stringify($json, null, 2);\nreturn [{\n  json: { ...$json },\n  binary: {\n    data: {\n      data: Buffer.from(content, 'utf8').toString('base64'),\n      fileName: 'precios_diseno.json',\n      mimeType: 'application/json',\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        512
+      ],
+      "id": "9829f9a9-e143-4871-95d2-7f1ca3fa85a1",
+      "name": "toBinary(normalized)"
+    },
+    {
+      "parameters": {
+        "fileName": "/opt/dv-system/datasets/normalized/precios_diseno.jso",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "7899b99e-7dc5-41be-b20e-166e0e9b5c53",
+      "name": "Write → /datasets/staging/precios_diseno.json1",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// rows ya viene del Merge (todas las hojas)\nconst rows = items.map(it => it.json);\n\n// normaliza números y deja “attrs” con columnas nuevas\nfunction toNumberMaybe(v){\n  if (typeof v === 'number') return v;\n  if (typeof v === 'string'){\n    const n = Number(v.replace?.(/[, ]/g,'') ?? v);\n    if (!Number.isNaN(n)) return n;\n  }\n  return v;\n}\nconst numKeys = ['publico_crc','colono_crc','cien_adicionales_crc','pack','cantidad_talonarios'];\nconst itemsOut = rows.map(r => {\n  const base = {...r};\n  for (const k of numKeys) if (k in base) base[k] = toNumberMaybe(base[k]);\n  // separa campos conocidos vs. extras (para compatibilidad futura)\n  const known = ['id','tipo_papel','medida','tiro','tramo','publico_crc','colono_crc','cien_adicionales_crc','pack','cantidad_talonarios','unidad','notas'];\n  const attrs = {};\n  for (const k of Object.keys(base)) if (!known.includes(k)) attrs[k] = base[k];\n\n  return {\n    id: String(base.id || '').trim(),\n    tipo_papel: base.tipo_papel ?? null,\n    medida: base.medida ?? null,\n    tiro: base.tiro ?? null,\n    tramo: base.tramo ?? null,\n    publico_crc: base.publico_crc ?? null,\n    colono_crc: base.colono_crc ?? null,\n    cien_adicionales_crc: base.cien_adicionales_crc ?? null,\n    pack: base.pack ?? null,\n    cantidad_talonarios: base.cantidad_talonarios ?? null,\n    unidad: base.unidad ?? null,\n    notas: base.notas ?? null,\n    attrs // columnas nuevas o específicas quedan aquí\n  };\n});\n\nconst payload = {\n  version: new Date().toISOString().slice(0,10),\n  moneda: 'CRC',\n  iva: 0.13,\n  descripcion: 'Tabla generada desde Sheets → staging → normalized',\n  items: itemsOut\n};\n\nreturn [{ json: payload }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        512
+      ],
+      "id": "29f2f523-a181-4cd3-ae06-1bf591680103",
+      "name": "buildNormalized()"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Sheets → Read (whitelist)": {
+      "main": [
+        [
+          {
+            "node": "Merge Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Build payload": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook /dv/refresh": {
+      "main": [
+        [
+          {
+            "node": "Sheets → Read (whitelist)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sheets → Read (whitelist)1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sheets → Read (whitelist)2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sheets → Read (whitelist)3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets → Read (whitelist)1": {
+      "main": [
+        [
+          {
+            "node": "Merge Sheets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Sheets → Read (whitelist)2": {
+      "main": [
+        [
+          {
+            "node": "Merge Sheets",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Sheets → Read (whitelist)3": {
+      "main": [
+        [
+          {
+            "node": "Merge Sheets",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Merge Sheets": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Build payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "buildNormalized()",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "writeRequested",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "toBinary(data)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toBinary(data)": {
+      "main": [
+        [
+          {
+            "node": "Write → /datasets/staging/precios_diseno.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toBinary(normalized)": {
+      "main": [
+        [
+          {
+            "node": "Write → /datasets/staging/precios_diseno.json1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buildNormalized()": {
+      "main": [
+        [
+          {
+            "node": "toBinary(normalized)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8e245d39-7b9b-4628-89a7-9ad6f70e3944",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "74de3f40f7dd03281c209a774f4ef3a825dc9bed1d417945c83acb6aabc41861"
+  },
+  "id": "JXjGIj2CVF3yfIlV",
+  "tags": []
+}

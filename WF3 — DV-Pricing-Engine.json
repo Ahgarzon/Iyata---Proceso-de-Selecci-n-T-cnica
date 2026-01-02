@@ -1,0 +1,266 @@
+{
+  "name": "WF3 — DV-Pricing-Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// DV | Validate Payload v6  (Function Item)\n// ===============================\n// Entrada esperada (desde DB / Intake):\n// {\n//   docId, nombre, phoneE164,\n//   intake_state_v1: {\n//     producto_id,\n//     parametros: { ... },\n//     cliente: { es_colono, id_colono, ... },\n//     done, done_final, needs_human, last_ask, last_message, history, updatedAt, ...\n//   }\n// }\n//\n// Salida: payload plano para el Pricing Engine, SIN campos\n// de fecha de entrega dentro de `parametros`.\n// Esos campos se guardan aparte en `delivery` para Trello / reporting.\n// ===============================\n\n// 1) Tomamos el estado de intake (o caemos al root si viene plano)\nconst s = $json.intake_state_v1 || $json;\n\n// 2) Validar que exista producto_id\nconst productoId = s.producto_id;\nif (!productoId) {\n  throw new Error('Falta producto_id');\n}\n\n// 3) Sacar cliente + parámetros\n//    -> cliente solo con lo que importa al motor (es_colono, id_colono)\nconst clienteBruto = s.cliente || {};\nconst cliente = {\n  es_colono: clienteBruto.es_colono ?? null,\n  id_colono: clienteBruto.id_colono ?? null,\n};\n\nconst parametros = { ...(s.parametros || {}) };\n\n// -----------------------------\n// 3.1 Compatibilidad de nombres\n// -----------------------------\n\n// tam -> tamano  (volantes)\nif (parametros.tamano == null && parametros.tam != null) {\n  parametros.tamano = parametros.tam;\n}\n\n// tamano_id -> tamano (afiches)\n//  ej: \"11x17\" -> \"11x17_pulg\", \"12x18\" -> \"12x18_pulg\"\nif (parametros.tamano == null && parametros.tamano_id != null) {\n  const raw = String(parametros.tamano_id).toLowerCase().trim();\n  if (raw === '11x17') {\n    parametros.tamano = '11x17_pulg';\n  } else if (raw === '12x18') {\n    parametros.tamano = '12x18_pulg';\n  } else {\n    // fallback genérico: usamos el valor tal cual\n    parametros.tamano = raw;\n  }\n}\n\n// tiro_y_retiro (bool) -> impresion (\"tiro\" | \"tiro_y_retiro\")\n// para que el selector_fila funcione (volantes)\nif (parametros.impresion == null) {\n  const t = parametros.tiro_y_retiro;\n  if (t === true || t === 'true' || t === 'tiro_y_retiro') {\n    parametros.impresion = 'tiro_y_retiro';\n  } else if (t === false || t === 'false' || t == null || t === 'tiro') {\n    // si es false o no está, asumimos \"tiro\" sencillo\n    parametros.impresion = 'tiro';\n  }\n}\n\n// -----------------------------\n// 3.2 Campos de entrega (NO motor)\n// -----------------------------\nconst DELIVERY_KEYS = [\n  'fecha_entrega',\n  'fecha_entrega_raw',\n  'fecha_entrega_iso', // el que tienes en BD\n  'fecha_entrega_lux', // por si a futuro usas este nombre\n];\n\nconst delivery = {};\nfor (const key of DELIVERY_KEYS) {\n  if (Object.prototype.hasOwnProperty.call(parametros, key)) {\n    delivery[key] = parametros[key];\n    delete parametros[key]; // limpio para el motor\n  }\n}\n\n// -----------------------------\n// 4) Normalizar strings en parámetros\n// -----------------------------\nfor (const k of Object.keys(parametros)) {\n  if (typeof parametros[k] === 'string') {\n    parametros[k] = parametros[k].trim().toLowerCase();\n  }\n}\n\n// -----------------------------\n// 5) Cuerpo final hacia el motor\n// -----------------------------\nconst body = {\n  producto_id: productoId,\n  cliente,\n  parametros,\n\n  // Metadatos útiles para logging / auditoría\n  context: {\n    docId:     $json.docId     ?? null,\n    phoneE164: $json.phoneE164 ?? null,\n    nombre:    $json.nombre    ?? null,\n  },\n\n  // Fechas de entrega disponibles para otros flujos (Trello, reporting, etc.)\n  delivery,\n};\n\nreturn [{ json: body }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        16
+      ],
+      "id": "4628e50f-94ea-4a1e-ae1b-6cbd2eef3166",
+      "name": "DV | Validate Payload (Function Item)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================\n// DV | Price Calc (Function) – n8n 1.106.x\n// ======================================\n// Lee nodos previos con $items(), admite Spec como {data:{...}}\n// Lógica: selector_fila + seleccion_columna[] + modo especial 'pack_100'\n\n/* ---------- helpers ---------- */\n\n// Evalúa expresiones tipo \"tamano=='carta' && es_colono==true\"\n// usando el contexto `ctx` (soporta es_colono, cliente.es_colono, etc.)\nfunction evalCond(cond, ctx) {\n  if (!cond || typeof cond !== 'string') return false;\n  try {\n    const fn = new Function('ctx', 'with (ctx) { return !!(' + cond + '); }');\n    return fn(ctx || {});\n  } catch (e) {\n    return false;\n  }\n}\n\nfunction fromNodeJSON(name) {\n  const got = $items(name, 0, 0);\n  const it  = Array.isArray(got) ? got[0] : got;\n  return (it && it.json) ? it.json : null;\n}\n\nfunction getRows(tabla) {\n  if (!tabla) return null;\n  if (Array.isArray(tabla)) return tabla;\n  if (Array.isArray(tabla.items)) return tabla.items;\n  if (Array.isArray(tabla.rows))  return tabla.rows;\n  if (tabla.data) {\n    if (Array.isArray(tabla.data.items)) return tabla.data.items;\n    if (Array.isArray(tabla.data.rows))  return tabla.data.rows;\n  }\n  return null;\n}\n\n/* -------------------------------- */\n\nconst payload       = fromNodeJSON('DV | Validate Payload (Function Item)');\nconst specWrap      = fromNodeJSON('DV | Spec JSON');\nconst preciosDiseno = fromNodeJSON('DV | Precios Diseño JSON');\nconst preciosGF     = fromNodeJSON('DV | Precios Gran Formato JSON');\n\nif (!payload)  return [{ hitl: true, motivo: \"Nodo 'DV | Validate Payload' sin datos.\" }];\nif (!specWrap) return [{ hitl: true, motivo: \"Nodo 'DV | Spec JSON' sin datos.\" }];\n\nconst spec = specWrap.data ?? specWrap;\nconst pb   = spec.pricing_bindings || spec.pricing;\nif (!pb) {\n  return [{\n    hitl: true,\n    motivo: \"Spec sin 'pricing_bindings' (o 'pricing').\",\n    producto_id: spec.producto_id || payload.producto_id,\n    spec_keys: Object.keys(spec),\n  }];\n}\n\n// Selección de tabla\nlet tablaPrecios = (spec.categoria === 'pequeno_formato') ? preciosDiseno : preciosGF;\nif (pb.tabla === 'precios_diseno')          tablaPrecios = preciosDiseno;\nelse if (pb.tabla === 'precios_gran_formato') tablaPrecios = preciosGF;\n\n// Contexto \"llano\" para las condiciones\n//  - parámetros del producto\n//  - es_colono como flag directo\n//  - cliente completo para expresiones tipo \"cliente.es_colono\"\nconst ctx = {\n  ...(payload.parametros || {}),\n  es_colono: !!(payload.cliente && payload.cliente.es_colono),\n  cliente: payload.cliente || {},\n};\n\n// =========================\n// 1) Resolver fila (rowId)\n// =========================\nlet filaKey = null;\nfor (const rule of (pb.selector_fila || [])) {\n  if (evalCond(rule.si, { ...ctx, ...ctx.cliente })) {\n    filaKey = rule.fila;\n    break;\n  }\n}\n\n// Si solo hay una fila en el mapeo, podemos usarla como fallback\nif (!filaKey && pb.mapeo_filas && Object.keys(pb.mapeo_filas).length === 1) {\n  filaKey = Object.keys(pb.mapeo_filas)[0];\n}\n\nif (!filaKey) {\n  return [{\n    hitl: true,\n    motivo: 'No se pudo determinar la fila (selector_fila).',\n    selector_fila: pb.selector_fila,\n    ctx,\n  }];\n}\n\nconst rowId = pb.mapeo_filas?.[filaKey] || filaKey;\n\n// ============================\n// 2) Resolver columna (colReal)\n// ============================\nlet colReal = null;\nif (Array.isArray(pb.seleccion_columna) && pb.seleccion_columna.length) {\n  for (const r of pb.seleccion_columna) {\n    if (evalCond(r.si, { ...ctx, ...ctx.cliente })) {\n      if (r.columna_por_cliente) {\n        const byClient = r.columna_por_cliente;\n        const condCli  = byClient.si || 'false';\n        const isCli    = evalCond(condCli, { ...ctx, ...ctx.cliente });\n        colReal = isCli ? (pb.columnas?.[byClient.columna])\n                        : (pb.columnas?.[byClient.sino]);\n      } else {\n        colReal = pb.columnas?.[r.columna];\n      }\n      break;\n    }\n  }\n} else {\n  // Fallback legacy por cantidad / colono\n  const cant = Number(payload.parametros?.cantidad ?? 1);\n  const esColono = !!(payload.cliente && payload.cliente.es_colono);\n  const colLog = cant < 100 ? (esColono ? 'colono' : 'publico')\n              : cant <= 500 ? 'rango_100_500'\n              : 'rango_mas_500';\n  colReal = pb.columnas?.[colLog];\n}\n\nif (!colReal && pb.calc !== 'pack_100') {\n  return [{\n    hitl: true,\n    motivo: 'No se resolvió la columna de precio.',\n    columnas: pb.columnas,\n    seleccion_columna: pb.seleccion_columna,\n  }];\n}\n\n// =======================\n// 3) Buscar fila en tabla\n// =======================\nconst filas = getRows(tablaPrecios);\nif (!filas) {\n  return [{\n    hitl: true,\n    motivo: 'Estructura de tabla de precios no reconocida (sin items/rows).',\n    tabla_keys: Object.keys(tablaPrecios || {}),\n  }];\n}\n\nconst fila = filas.find(r =>\n  r?.id === rowId ||\n  r?.key === rowId ||\n  r?.codigo === rowId ||\n  r?.alias === rowId ||\n  r?.row_id === rowId,\n);\n\nif (!fila) {\n  return [{\n    hitl: true,\n    motivo: `No existe fila '${rowId}' en la tabla.`,\n    rowId,\n    sample: filas.slice(0, 5),\n  }];\n}\n\n// ======================\n// 4) Cálculo de importe\n// ======================\nconst cant     = Number(payload.parametros?.cantidad ?? 1);\nconst esColono = !!(payload.cliente && payload.cliente.es_colono);\n\n// --- modo especial: paquetes de 100 (tarjetas) ---\nif (pb.calc === 'pack_100') {\n  const baseCol  = pb.columnas\n    ? (pb.seleccion_columna\n        ? colReal // ya resuelto por reglas\n        : (esColono ? pb.columnas.colono : pb.columnas.publico))\n    : null;\n\n  const extraCol = pb.columnas ? pb.columnas['extra_100'] : null;\n\n  if (!baseCol || !extraCol) throw new Error('Config pack_100 incompleta (columnas)');\n  const precioBase100  = Number(fila[baseCol]);\n  const precioExtra100 = Number(fila[extraCol] ?? 0);\n  if (!isFinite(precioBase100)) throw new Error('Precio base inválido para pack_100');\n\n  const packs    = Math.ceil(cant / 100);\n  const extras   = Math.max(packs - 1, 0);\n  const subtotal = precioBase100 + extras * precioExtra100;\n  const iva      = Number(pb.iva ?? 0);\n  const total    = subtotal * (1 + iva);\n\n  return [{\n    ok: true,\n    producto_id: payload.producto_id ?? spec.producto_id,\n    categoria: spec.categoria,\n    parametros: payload.parametros,\n    es_colono: esColono,\n    rowId,\n    colReal: baseCol,\n    moneda: pb.moneda || 'CRC',\n    precio_base_pack100: precioBase100,\n    precio_extra_por_100: precioExtra100,\n    packs,\n    extras,\n    subtotal,\n    iva_pct: iva,\n    total,\n  }];\n}\n\n// --- cálculo estándar unitario ---\nconst pu = Number(fila[colReal]);\nif (!isFinite(pu)) {\n  return [{\n    hitl: true,\n    motivo: `Precio inválido en columna '${colReal}'`,\n    fila,\n  }];\n}\n\nconst subtotal = pu * cant;\nconst iva      = Number(pb.iva ?? 0);\nconst total    = subtotal * (1 + iva);\n\nreturn [{\n  ok: true,\n  producto_id: payload.producto_id ?? spec.producto_id,\n  categoria: spec.categoria,\n  parametros: payload.parametros,\n  es_colono: esColono,\n  rowId,\n  colReal,\n  moneda: pb.moneda || 'CRC',\n  precio_unitario: pu,\n  cantidad: cant,\n  subtotal,\n  iva_pct: iva,\n  total,\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        0
+      ],
+      "id": "fd88af96-1f3e-4dba-a038-f6cd6646472c",
+      "name": "DV | Price Calc (Function)"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        16
+      ],
+      "id": "2c9503e8-e574-4d79-9e2a-1e1e95aea172",
+      "name": "DV | Spec JSON"
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/data/dv-system/datasets/normalized/precios_diseno.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a30e1dd8-2f46-492a-a620-8f0a498cb0f5",
+      "name": "DV | Load Precios Diseño"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2234e594-911a-4202-96ec-b606cbb70a5e",
+      "name": "DV | Precios Diseño JSON"
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/data/dv-system/datasets/normalized/precios_gran_formato.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "5e5be043-072e-4186-854b-43defc61545f",
+      "name": "DV | Load Precios Gran Formato"
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/data/dv-system/datasets/normalized/product_specs/{{$json.producto_id}}.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        16
+      ],
+      "id": "35d119e0-1e0a-44b3-8277-d6547134833e",
+      "name": "DV | Load Spec"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        640,
+        0
+      ],
+      "id": "869dbc20-ab18-4b7d-850d-e18055085d0e",
+      "name": "DV | Precios Gran Formato JSON"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        16
+      ],
+      "id": "3dc3fb41-6535-482a-b773-19eae49b820a",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: Build Final Msg  (n8n \"Function\" node)\n// ENTRADA esperada (desde Execute Workflow DV-Pricing-Engine):\n// {\n//   ok: true,\n//   producto_id: \"tarjetas|roller_up|volantes|afiches\",\n//   categoria: \"...\",\n//   parametros: { ... campos del cálculo ... },\n//   es_colono: false,\n//   moneda: \"CRC\",\n//   precio_base_pack100: 15500,  // (según tu motor)\n//   precio_extra_por_100: 5500,\n//   packs: 1,\n//   extras: 0,\n//   subtotal: 15500,\n//   iva_pct: 0.13,\n//   total: 17515,\n//   // (además, en el item previo del Intake pueden venir)\n//   // params.phone, meta.wa_from, meta.ws_from, contact.name, conversation_id, etc.\n// }\n\n// SALIDA de este nodo:\n// { phone: \"<destino WA>\", message: \"<texto listo para enviar>\" }\n\nfunction pick(o, keys) {\n  for (const k of keys) {\n    const v = k.split('.').reduce((acc, k2) => (acc && acc[k2] != null ? acc[k2] : undefined), o);\n    if (v !== undefined && v !== null && v !== '') return v;\n  }\n  return null;\n}\n\n// 1) Tomar phone de donde esté disponible (prioridad: explícito en params → meta → legacy)\nconst phone =\n  pick($json, [\n    'params.phone',\n    'parametros.phone',\n    'phone',\n    'meta.wa_from',\n    'meta.ws_from',\n    'meta.waFrom',\n    'meta.contact.phone',\n  ]) || null;\n\n// 2) Campos base del pricing\nconst pid   = $json.producto_id || 'N/D';\nconst p     = $json.parametros || {};\nconst isCol = ($json.es_colono === true);\n\n// 3) Formateador CRC / USD (por ahora usas CRC)\nconst currency = ($json.moneda || 'CRC').toUpperCase();\nconst fmtMoney = (n) => {\n  try {\n    return new Intl.NumberFormat('es-CR', { style: 'currency', currency }).format(Number(n || 0));\n  } catch {\n    return `${Number(n || 0).toLocaleString('es-CR')} ${currency}`;\n  }\n};\n\n// 4) Etiquetas por producto para que el cliente lo entienda\nfunction renderParams(pid, p) {\n  const yesNo = (b) => (b === true ? 'sí' : b === false ? 'no' : (b ?? 'N/D'));\n  const lines = [];\n\n  if (pid === 'tarjetas') {\n    lines.push(`• Material: ${p.material ?? 'N/D'}`);\n    lines.push(`• Plastificado: ${p.plastificado ?? 'N/D'}`);\n    lines.push(`• Doble cara (tiro y retiro): ${yesNo(p.tiro_y_retiro)}`);\n    lines.push(`• Cantidad: ${p.cantidad ?? 'N/D'}`);\n  } else if (pid === 'roller_up') {\n    lines.push(`• Ancho: ${p.ancho_cm ?? 'N/D'} cm`);\n    lines.push(`• Alto: ${p.alto_cm ?? 'N/D'} cm`);\n    lines.push(`• Material: ${p.material ?? 'N/D'}`);\n    lines.push(`• Con estructura: ${yesNo(p.con_estructura)}`);\n    lines.push(`• Cantidad: ${p.cantidad ?? 'N/D'}`);\n  } else if (pid === 'volantes') {\n    lines.push(`• Material: ${p.material ?? 'N/D'}`);\n    lines.push(`• Tamaño: ${p.tamaño ?? 'N/D'}`);\n    lines.push(`• Doble cara (tiro y retiro): ${yesNo(p.tiro_y_retiro)}`);\n    lines.push(`• Cantidad: ${p.cantidad ?? 'N/D'}`);\n  } else if (pid === 'afiches') {\n    lines.push(`• Material: ${p.material ?? 'N/D'}`);\n    lines.push(`• Ancho: ${p.ancho_cm ?? 'N/D'} cm`);\n    lines.push(`• Alto: ${p.alto_cm ?? 'N/D'} cm`);\n    lines.push(`• Cantidad: ${p.cantidad ?? 'N/D'}`);\n  } else {\n    // fallback genérico si a futuro agregas otros productos\n    Object.entries(p).forEach(([k,v]) => lines.push(`• ${k}: ${v}`));\n  }\n  return lines.join('\\n');\n}\n\n// 5) Construir texto final\nconst detalle = renderParams(pid, p);\nconst subtotal = fmtMoney($json.subtotal);\nconst total    = fmtMoney($json.total);\nconst ivaPct   = ($json.iva_pct != null) ? `${Math.round(Number($json.iva_pct) * 100)}%` : 'N/D';\n\n// Nota: “colono” afecta el motor, pero lo incluimos como cortesía\nconst colonoStr = isCol ? 'sí' : 'no';\n\n// Puedes personalizar nombre/contacto si lo pasas del Intake\nconst clienteNombre = pick($json, ['contact.name', 'cliente.nombre']) || '';\n\nconst texto = [\n  (clienteNombre ? `Hola ${clienteNombre},` : 'Hola,'),\n  `te comparto el resumen de tu cotización:`,\n\n  '',\n  `Producto: ${pid}`,\n  detalle,\n\n  '',\n  `¿Es colono?: ${colonoStr}`,\n  `Moneda: ${currency}`,\n  `Subtotal: ${subtotal}`,\n  `Impuesto (${ivaPct}): incluido en el total`,\n  `TOTAL: ${total}`,\n\n  '',\n  '¿Deseas confirmar este pedido? Responde *sí* para generar la orden y coordinar tiempos de entrega/pago. ' +\n  'Si necesitas ajustar algún detalle (cantidad, material, tamaño), dime qué cambiar.'\n].join('\\n');\n\n// 6) Resultado para el nodo de WhatsApp/Telegram\nreturn [\n  {\n    json: {\n      phone,                 // úsalo en “Recipient’s Phone Number”: {{ $json.phone }}\n      message: texto,        // úsalo en “Message”: {{ $json.message }}\n      // Por si luego quieres registrar:\n      producto_id: pid,\n      parametros: p,\n      es_colono: isCol,\n      total_num: Number($json.total || 0),\n      moneda: currency\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "61d923d4-2950-44eb-96a4-e0df3c24615b",
+      "name": "Build Final Msg"
+    }
+  ],
+  "pinData": {
+    "DV | Validate Payload (Function Item)": [
+      {
+        "json": {
+          "name": "First item",
+          "code": 1
+        }
+      },
+      {
+        "json": {
+          "name": "Second item",
+          "code": 2
+        }
+      }
+    ]
+  },
+  "connections": {
+    "DV | Validate Payload (Function Item)": {
+      "main": [
+        [
+          {
+            "node": "DV | Load Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Spec JSON": {
+      "main": [
+        [
+          {
+            "node": "DV | Load Precios Diseño",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Load Precios Diseño": {
+      "main": [
+        [
+          {
+            "node": "DV | Precios Diseño JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Precios Diseño JSON": {
+      "main": [
+        [
+          {
+            "node": "DV | Load Precios Gran Formato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Load Precios Gran Formato": {
+      "main": [
+        [
+          {
+            "node": "DV | Precios Gran Formato JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Load Spec": {
+      "main": [
+        [
+          {
+            "node": "DV | Spec JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Precios Gran Formato JSON": {
+      "main": [
+        [
+          {
+            "node": "DV | Price Calc (Function)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "DV | Validate Payload (Function Item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV | Price Calc (Function)": {
+      "main": [
+        [
+          {
+            "node": "Build Final Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "21425dcc-716b-488f-95e3-12cee28eb0bc",
+  "meta": {
+    "instanceId": "74de3f40f7dd03281c209a774f4ef3a825dc9bed1d417945c83acb6aabc41861"
+  },
+  "id": "MRfMPY5mWkHj6mrw",
+  "tags": []
+}

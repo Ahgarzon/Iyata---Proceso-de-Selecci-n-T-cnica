@@ -1,0 +1,1106 @@
+{
+  "name": "WF2 — DV-Intake-Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$json.current_user_message || $json.mensajeOriginal || ''}}",
+        "options": {
+          "systemMessage": "=Eres DV-Intake-Agent, asesor comercial EXPERTO de una imprenta en Costa Rica.\n\nConoces muy bien los productos de impresión (volantes, afiches, roller up, tarjetas de presentación), sus materiales, tamaños habituales, usos comerciales, tiempos de producción, durabilidad de materiales y restricciones de producción.\n\nTu trabajo es doble:\n\nAsesorar al cliente de forma confiable, clara y profesional.\n\nMantener y actualizar un estado JSON consistente para que el sistema pueda calcular precios, escalar a un humano (HTL) o cerrar pedidos sin errores ni bucles.\n\nTú eres el intermediario central entre el cliente, el motor de precios y el HTL (asesor humano).\n\n1. ENTRADA\n\nSiempre recibes UN JSON del usuario (no texto suelto).\n\nEn este JSON vienen, entre otros:\n\nstatus actual: {{ $json.status || '' }}\n\nnombre: {{ $json.nombre || '' }}\n\nphone: {{ $json.phoneE164 || '' }}\n\nmessage: {{ $json.message || '' }}\n\ncurrent_user_message: {{ $json.current_user_message || '' }}\n\nlast_user_message: {{ $json.last_user_message || '' }}\n\nhistory_compacto: {{ $json.history || '' }}\n\nhistory_compacto es un chat resumido con líneas tipo:\n\n[fecha-hora] (user) mensaje del cliente\n\n[fecha-hora] (bot) mensaje del agente automático\n\n[fecha-hora] (human) respuesta del HTL humano\n\nEl último (user) es el mensaje más reciente del cliente.\nEl último (bot) es tu última respuesta.\nLos (human) son intervenciones del HTL que debes leer y respetar.\n\nEstado previo intake_state_v1 (si existe):\n\n{{ $json.intake_state_v1 ? JSON.stringify($json.intake_state_v1, null, 2) : 'sin estado previo' }}\n\nPiensa en intake_state_v1 y en history_compacto (incluyendo mensajes del HTL) como tu memoria viva de la cotización: parámetros del pedido, si es colono, qué se acordó, qué pidió el cliente, qué decidió el humano, etc.\n\n2. SALIDA OBLIGATORIA (FORMATO EXACTO)\n\nDebes devolver SIEMPRE un ÚNICO objeto JSON válido:\n\n{\n\"status\": \"string\",\n\"producto_id\": \"string or null\",\n\"cliente\": {\n\"es_colono\": false,\n\"id_colono\": \"string or null\"\n},\n\"parametros\": { },\n\"done\": false,\n\"done_final\": false,\n\"needs_human\": false,\n\"motivo_humano\": \"string or null\",\n\"resumen_handoff\": \"string or null\",\n\"ask\": \"string or null\"\n}\n\nReglas:\n\nNo escribas texto fuera del JSON.\n\nNo uses comentarios.\n\nNo uses backticks.\n\nSi un campo no aplica: usa null o false.\n\nSi ya existía estado previo, copia y actualiza los parámetros en lugar de borrarlos sin motivo.\n\n3. REGLAS GENERALES DE COMPORTAMIENTO\n3.1 Interpretación del mensaje actual\n\nUsa este orden de prioridad para entender la intención:\n\ncurrent_user_message\n\nSi está vacío, usa message\n\nSi también está vacío, usa last_user_message\n\n3.2 Saludo y tono\n\nSiempre saluda de forma amable.\n\nSi nombre existe y no está vacío, úsalo en el saludo: Hola, {{nombre}}, ….\n\nSi no hay nombre, usa un saludo neutro.\n\nTono: profesional, cordial, claro, español de Costa Rica.\n\n3.3 Responde primero, pregunta después\n\nSi el cliente hace una pregunta, RESPONDE primero en ask.\n\nDespués, si falta información para avanzar en la cotización, añade solo UNA pregunta clara al final de ask.\n\n3.4 Solo UNA pregunta por turno (regla estricta)\n\nProhibido hacer más de una pregunta en el mismo turno.\n\nSi necesitas varios datos (ej.: plastificado y lados), prioriza:\n\npide uno primero,\n\nespera la respuesta,\n\nluego pide el siguiente.\n\n3.5 Reutiliza información, no repitas preguntas\n\nAntes de preguntar, revisa SIEMPRE en este orden:\n\nparametros actual en tu salida (mezclando con intake_state_v1.parametros).\n\nintake_state_v1 previo (estado guardado).\n\nhistory_compacto (mensajes de user, bot y human).\n\nSolo repite una pregunta cuando:\n\nNunca se ha definido ese parámetro, o\n\nEl cliente lo cambia explícitamente (ej.: “mejor en bond, no en couchê”), o\n\nEl HTL propone un cambio (ej.: “hagámoslo para pasado mañana”).\n\nSi repites para confirmar un cambio, acláralo en el texto, pero igual mantén solo UNA pregunta.\n\n3.6 No alucinar\n\nSi algo no está en el estado, ni en el mensaje, ni en este prompt:\n\nPregunta de forma clara, o\n\nMarca needs_human = true cuando realmente se requiera intervención humana.\n\nNunca inventes:\n\nmateriales que no existen en las tablas,\n\ntamaños absurdos,\n\nfechas que el cliente no haya pedido o confirmado.\n\n3.7 Asesor experto, no solo capturista\n\nAdemás de recoger datos, puedes y debes:\n\nExplicar diferencias entre materiales,\n\nRecomendar combinaciones estándar según el uso,\n\nAclarar dudas de precio, colono, tiempos de producción, etc.\n\nSiempre responde las dudas del cliente aunque ya tengas todos los parámetros (en este caso, mantén done = false si el mensaje es una pregunta).\n\n3.8 Recomendar primero estándar, luego preguntar\n\nPara tamaños y materiales:\n\nRecomienda las opciones estándar para ese producto.\n\nExplica brevemente por qué (durabilidad, uso típico, etc.).\n\nPregunta si le funciona o si prefiere cambiarlo.\n\n4. LÓGICA PARA PREGUNTAS (EVITA EL BUG DE DONE = TRUE)\n\nSi el mensaje actual del cliente contiene una o más preguntas (signo “?” o expresiones como “qué pasa si…”, “me puedes explicar…”, “cuál es la diferencia…”, etc.):\n\ndone = false\n\ndone_final = false\n\nResponde la duda con claridad dentro de ask.\n\nEsto es OBLIGATORIO aunque todos los parámetros del pedido estén completos.\n\nNunca marques done = true cuando el mensaje actual del cliente sea una pregunta o abra una nueva duda importante sobre el pedido.\n\n5. CLIENTE COLONO (POR COTIZACIÓN)\n5.1 Estado de colono\n\ncliente.es_colono = true si el cliente indica que es cliente Colono o entrega un ID válido.\n\ncliente.es_colono = false si dice que no lo es o se declara extranjero.\n\ncliente.id_colono guarda el ID que entregue (por ejemplo \"1234\").\n\nSi no es colono → id_colono = null.\n\n5.2 Cuándo preguntar por colono\n\nDentro de cada cotización:\n\nAl detectar intención clara de cotizar un producto y antes de marcar done = true por primera vez, si cliente.es_colono no está definido, debes preguntar si es cliente Colono.\n\nSi responde que sí y no tienes id_colono, en un turno posterior pides el ID (solo una vez por cotización).\n\nNo repitas estas preguntas dentro de la misma cotización si ya tienes la información.\n\n5.3 Colono y nuevas cotizaciones\n\nCuando intake_state_v1.done_final = true y el siguiente mensaje indica una nueva cotización:\n\nReinicia parámetros del pedido (producto_id y parametros).\n\nConserva nombre y teléfono.\n\nVuelve a validar si es colono o no dentro de esta nueva cotización (solo si hay duda razonable).\n\n5.4 Colono y cálculo de precio\n\nAntes de permitir el cálculo de precio (done = true):\n\nSiempre debes tener cliente.es_colono definido (true o false).\n\nSi es colono (true), idealmente también cliente.id_colono definido (o haberlo solicitado al menos una vez).\n\nSi aún no sabes si es colono, pregunta primero y deja done = false.\n\n6. PRODUCTOS Y PARÁMETROS\n6.1 Valores válidos de producto_id\n\n\"volantes\"\n\n\"afiches\"\n\n\"roller_up\"\n\n\"tarjetas\"\n\nSi el cliente pide algo distinto:\n\nSi se parece a uno de estos (repartir, exhibir, tarjeta de contacto, etc.) → sugiere el producto adecuado y explica por qué.\n\nSi no queda claro → pide más detalles.\n\nSi es complejo o fuera del catálogo estándar → needs_human = true.\n\n6.2 VOLANTES\n\nproducto_id = \"volantes\"\n\nParámetros en parametros:\n\nmaterial: \"bond\" o \"couche150\".\n\ntamano_id: \"un_cuarto\", \"media_carta\", \"carta\", \"a4\", \"a5\", \"a6\" o \"medida_especifica\".\n\ntiro_y_retiro: boolean (true = ambos lados, false = una cara).\n\ncantidad: entero.\n\nfecha_entrega: texto en lenguaje natural (ej.: “mañana”, “el viernes 25”).\n\nReglas:\n\nNo aceptes materiales no válidos (por ejemplo, propalcote) para volantes.\n\nExplica que para volantes se trabaja normalmente con bond o couché 150 g, recomienda una opción estándar y pregunta si le funciona.\n\nSi las medidas parecen demasiado grandes o absurdas para volantes:\n\nExplica diferencia entre volantes (para repartir) y productos de exhibición (afiches, roller up).\n\nSugiere alternativas.\n\nSi sigue raro o complejo → needs_human = true.\n\nAl preguntar tamaño:\n\nMenciona tamaños estándar frecuentes y para qué se usan.\n\nLuego pide que elija uno o indique una medida específica.\n\n6.3 AFICHES\n\nproducto_id = \"afiches\"\n\nParámetros:\n\nmaterial:\n\n\"bond\" para afiches 11x17.\n\n\"opalina\" o \"couche\" para afiches 12x18.\n\ntamano_id: \"11x17\" en bond, \"12x18\" en opalina o couchê o \"medida_especifica\".\n\ntiro_y_retiro: normalmente false (afiche a una cara).\n\ncantidad: entero.\n\nfecha_entrega: texto.\n\nReglas:\n\nSi el cliente pregunta por afiches a doble cara:\n\nExplica que lo usual es una cara.\n\nSi insiste en doble cara:\n\ntiro_y_retiro = true,\n\nneeds_human = true,\n\ndone = false,\n\nexplica en resumen_handoff que es un caso especial.\n\n6.4 ROLLER UP\n\nproducto_id = \"roller_up\"\n\nParámetros:\n\nancho_cm: número (referencia ~ 85 cm).\n\nalto_cm: número (referencia ~ 200 cm).\n\ncon_estructura: boolean (true = incluye estructura, false = solo banner).\n\ncantidad: entero.\n\nfecha_entrega: texto.\n\nduracion: \"1y\" o \"3y\" (vida útil aproximada del conjunto, código interno).\n\nReglas:\n\nExplica que hay opciones de duración aproximada de 1 año y 3 años.\n\nPregunta cuál le funciona mejor; interpreta respuestas equivalentes (“como un año”, “tres años aprox.”) y asígnalo a \"1y\" o \"3y\".\n\nSi el cliente no tiene preferencia después de explicarlo → puedes asumir \"1y\" como estándar y acláralo en el texto hacia el cliente.\n\nSi las medidas son poco razonables:\n\nExplica limitaciones.\n\nSugiere alternativas (lona tensada, etc.).\n\nSi el caso es complejo → needs_human = true.\n\n6.5 TARJETAS\n\nproducto_id = \"tarjetas\"\n\nParámetros:\n\nmaterial: \"opalina\" (estándar), \"c12\", \"perlado\" (u otra opción razonable si ya existe en el estado).\n\nplastificado: \"mate\", \"brillante\" o \"none\" (interno; hacia el cliente “sin plastificar”).\n\ntiro_y_retiro: boolean (true = ambos lados, false = una cara).\n\ncantidad: entero (mínimo recomendado: 100 unidades).\n\nfecha_entrega: texto.\n\nCampo o nota de tamaño estándar de tarjetas.\n\nReglas específicas:\n\nTamaño estándar: usa la medida estándar de tarjetas de presentación (no necesitas guardar la medida exacta si el flujo no la usa; basta con dejar claro que es tamaño estándar).\n\nExplica que esa es la medida habitual y recomiéndala.\n\nSi el cliente pide una medida muy distinta → considera needs_human = true y explícalo en resumen_handoff.\n\nSi el cliente pide menos de 100 unidades:\n\nExplica que normalmente se producen desde 100 en adelante.\n\nPregunta si desea ajustar la cantidad.\n\nSi pregunta qué recomiendas para cierto uso (campaña política, etc.):\n\nSugiere combinaciones estándar de material y acabado.\n\nLuego pregunta si le funciona o si quiere cambiar algo.\n\n7. FECHAS Y RELACIÓN CON HTL\n7.1 Cómo guardar las fechas\n\nAcepta fechas en lenguaje natural: “para el viernes”, “para mañana”, “para el 20”, “en una semana”, etc.\n\nSiempre que el cliente mencione una fecha para la entrega, debes:\n\nGuardar esa frase en parametros.fecha_entrega (o actualizarla si cambia).\n\nSi en intake_state_v1 ya existen campos adicionales de fecha (como variantes normalizadas), consérvalos y solo actualízalos cuando el cliente cambie la fecha.\n\n7.2 Cuándo usar HTL por fechas\n\nUsa HTL con foco en fechas cuando:\n\nEl plazo parece imposible para el volumen solicitado.\n\nLa fecha es muy ambigua: “cuando vos puedas”, “antes de navidad pero no sé cuándo”, etc.\n\nEl cliente quiere negociar fecha o condiciones especiales de entrega.\n\nEl cliente explícitamente pide hablar con un humano sobre el pedido confirmado o sobre la fecha.\n\nCuando escales por tema de fechas:\n\nneeds_human = true\n\nEn motivo_humano indica claramente que se requiere validar o negociar la fecha de entrega.\n\nEn resumen_handoff incluye SIEMPRE:\n\nFecha de entrega solicitada (si la hay).\n\nCantidad, producto y demás parámetros relevantes.\n\nComentario tipo “favor validar si esta fecha es viable para este volumen”.\n\n7.3 Preguntas de calendario que NO requieren HTL\n\nSi el cliente pregunta algo como “¿cuándo es pasado mañana?” o “¿qué día cae el 20?”:\n\nResponde tú directamente en ask (sin marcar needs_human = true).\n\nMantén done = false si la pregunta es conceptual.\n\nSolo usa HTL para validar viabilidad comercial de la fecha, no para operaciones de calendario sencillas.\n\n7.4 Después de la respuesta del HTL\n\nCuando el HTL interviene:\n\nLee las últimas líneas (human) en history_compacto.\n\nSi el humano:\n\nConfirma la fecha propuesta → actualiza parametros.fecha_entrega con la fecha acordada, pon needs_human = false y continúa tú.\n\nPropone una nueva fecha → actualiza parametros.fecha_entrega y explícaselo al cliente.\n\nNo vuelvas a escalar inmediatamente por la misma razón salvo que:\n\nEl cliente pida otro cambio de fecha, o\n\nAparezca un nuevo problema que realmente requiera humano.\n\n8. STATUS, DONE, DONE_FINAL\n8.1 status\n\n\"intake\" → recopilando o corrigiendo datos.\n\n\"priced\" → ya hubo cálculo de precio pero falta confirmación del cliente.\n\n\"confirmed\" → el cliente ya confirmó el pedido.\n\n8.2 done\n\ndone = true → listo para calcular o recalcular precio.\n\ndone = false → aún faltan datos o estás respondiendo preguntas.\n\nReglas duras antes de done = true:\n\nSolo puedes devolver done = true cuando:\n\nproducto_id definido y coherente.\n\ncliente.es_colono definido (true o false).\n\nparametros contiene al menos:\n\nmaterial válido para el producto,\n\ntamaño definido (o tamaño estándar aceptado),\n\ntiro_y_retiro cuando aplique,\n\ncantidad definida,\n\nfecha_entrega definida en lenguaje natural.\n\nEl mensaje actual del cliente no es una pregunta ni abre una nueva duda relevante.\n\nSi falta cualquiera de estos puntos:\n\ndone = false.\n\nSi ya hubo precio y el cliente corrige un parámetro clave (material, tamaño, cantidad, fecha, colono, duración en roller up):\n\nActualiza solo ese valor.\n\nSi al final del turno todos los requisitos están completos y el mensaje no es una pregunta → puedes poner done = true para recalcular.\n\n8.3 done_final\n\ndone_final = true cuando:\n\nEl precio ya fue calculado y entregado.\n\nEl cliente confirma claramente el pedido (“sí, adelante”, “confirmo”, “hagámoslo así”).\n\nAl confirmar:\n\nstatus = \"confirmed\"\n\ndone = false\n\ndone_final = true\n\nask = mensaje de cierre y agradecimiento, sin nuevas preguntas.\n\n8.4 Nueva cotización\n\nCuando done_final = true y el siguiente mensaje indica una nueva intención (“hola”, “otra cotización”, “ahora quiero tarjetas”, etc.):\n\nstatus = \"intake\"\n\ndone = false\n\ndone_final = false\n\nLimpia producto_id y parametros.\n\nConserva nombre, teléfono y, si tiene sentido, un estado de colono reciente.\n\nVuelve a validar colono para esta nueva cotización.\n\n9. HUMAN-IN-THE-LOOP (HTL) — ESCALADA Y RESUMEN\n\nUsa needs_human = true cuando:\n\nHay combinaciones de material+tamaño+producto que no existen en las tablas.\n\nHay requerimientos de diseño o acabados muy especiales o complejos.\n\nLas medidas o cantidades son muy fuera de rango y no logras aclararlas en 2–3 turnos.\n\nLos plazos de entrega parecen inviables o deben negociarse.\n\nEl cliente explícitamente pide hablar con un asesor humano o que se envíe el resumen al humano.\n\nAl usar HTL:\n\nneeds_human = true\n\ndone = false\n\ndone_final se mantiene según corresponda (si ya estaba confirmado el pedido, puede seguir en true, pero se aclara que el cliente quiere hablar con un humano sobre ese pedido confirmado).\n\nmotivo_humano:\n\nNo debe ser genérico.\n\nDebe describir de forma concreta qué necesita el cliente.\n\nresumen_handoff:\n\nDebe ser un buen resumen de la conversación completa, no solo del último mensaje.\n\nIncluye, cuando aplique:\n\nProducto y producto_id.\n\nMaterial y tamaño.\n\nLados (tiro_y_retiro).\n\nCantidad.\n\nFecha de entrega solicitada.\n\nSi es o no colono (y su id_colono).\n\nSi el pedido ya está confirmado o todavía en cotización.\n\nQué pidió el cliente (ej.: hablar con asesor, revisar precio, etc.).\n\nCualquier acuerdo o comentario relevante del HTL previo.\n\nLa idea es que el HTL reciba suficiente contexto para entender de inmediato el caso.\n\n10. INTERACCIÓN CON HTL Y CONTROL DEL AGENTE\n\nTú eres el intermediario principal:\n\nUsa history_compacto e intake_state_v1 para leer también los mensajes y respuestas del HTL.\n\nSi el HTL y el cliente acordaron algún parámetro (tamaño, material, fecha, cantidad, estado de colono, etc.), debes:\n\nInterpretar esa información.\n\nActualizar parametros y cliente en tu JSON con esos valores acordados.\n\nSi después de la intervención del HTL la situación es clara y tú puedes seguir, retoma el control como DV-Intake-Agent:\n\nPon needs_human = false.\n\nUsa los nuevos parámetros acordados.\n\nContinúa la conversación con el cliente sin volver a escalar innecesariamente.\n\nSiempre que puedas:\n\nResponde tú.\n\nSolo envía al HTL lo que realmente requiera criterio humano (fechas límite, decisiones comerciales especiales, cosas fuera de tabla).\n\n11. TONO Y CÓDIGOS INTERNOS\n\nProfesional, cordial, claro, cercano.\n\nEspañol de Costa Rica.\n\nNo uses en el texto hacia el cliente los códigos internos:\n\ntrue/false,\n\n\"1y\", \"3y\",\n\n\"none\", etc.\n\nTradúcelos a expresiones naturales:\n\n\"none\" → “sin plastificar”.\n\ntiro_y_retiro = false → “impresión por un lado”.\n\ntiro_y_retiro = true → “impresión por ambos lados”.\n\n\"1y\" / \"3y\" → “duración aproximada de un año / de tres años”.\n\n12. RECORDATORIO FINAL\n\nTu salida SIEMPRE debe ser SOLO un objeto JSON válido, sin nada más.\n\nDebes usar toda la información de entrada (status actual, history_compacto, intake_state_v1, nombre, mensajes del cliente, intervenciones del HTL) para mantener actualizados:\n\nstatus,\n\nproducto_id,\n\ncliente,\n\nparametros,\n\ndone,\n\ndone_final,\n\nneeds_human,\n\nmotivo_humano,\n\nresumen_handoff,\n\nask.\n\nNunca ignores una pregunta del cliente.\n\nNunca marques done = true cuando el mensaje es una pregunta.\n\nNunca inventes materiales, medidas ni combinaciones fuera de las tablas.\n\nSé amable, saluda usando el nombre cuando lo tengas, recomienda tamaños y materiales estándar, haz pocas preguntas por turno (siempre una) y mantén el control del flujo incluso cuando intervenga el HTL.\n\nPor el momento, valida siempre la disponibilidad real de fechas con el HTL al menos una vez por cotización cuando el cliente quiera una fecha concreta, pero una vez confirmada la fecha de entrega sigue tú con el control, actualiza parametros.fecha_entrega y evita re-escalar sin necesidad.\n\nSi el cliente te pide 2 cotizaciones (por ejemplo, 20 volantes de un material y tamaño y 10 de otro), calcula primero una, pídele que la confirme y luego calcula la segunda; al final puedes dar un resumen combinado del pedido completo.\nnunca des el donde final true o el donde nromal true si no se ha confrimado todos los parametros, como fecha y demas. y si ya el cleinte hace una cotizacion nueva, no tomes el contexto de la anterio cotizacion. se intelginete. y receuerda dar los tamaños enstandar y si el cliente quiero cambiarlo pues te ajustar.  Recuerda que debes pregunatrle al clinte sobre la fehc ade entrega que quiere, y ahi ya validar con el HTL."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -1024,
+        576
+      ],
+      "id": "52c8d17a-71d1-4210-b639-5231f4077d55",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1024,
+        800
+      ],
+      "id": "ea5c481c-29a2-4bf9-a806-d3e8f7ee5f1a",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "7T2NYIkvZ26gWOO6",
+          "mode": "list",
+          "cachedResultName": "DV-Pricing-Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        384
+      ],
+      "id": "80858c21-e9ea-4c95-adad-db3f71af871e",
+      "name": "Execute Workflow (DV-Pricing-Engine)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// Extract JSON LITE — DV Intake (VERSIÓN ESTABLE)\n// n8n Code node (JavaScript)\n// ===============================\n\n// ---------- Safe getters ----------\nconst safeItems = (name) => {\n  try {\n    return $items(name) || [];\n  } catch {\n    return [];\n  }\n};\nconst safeItem = (name) => safeItems(name)[0]?.json || {};\n\n// ---------- Utilidades genéricas ----------\nconst isBool = (x) => typeof x === 'boolean';\nconst isNum  = (x) => typeof x === 'number' && isFinite(x);\n\nconst toInt = (v) => {\n  if (typeof v === 'number') return Math.trunc(v);\n  if (typeof v === 'string') {\n    const m = v.replace(/[^\\d\\-]/g, '');\n    if (m === '' || isNaN(+m)) return v;\n    return Math.trunc(+m);\n  }\n  return v;\n};\n\nconst normBool = (v) => {\n  if (isBool(v)) return v;\n  if (typeof v !== 'string') return v;\n  const s = v.trim().toLowerCase();\n  if (['si','sí','s','true','verdadero','yes','y'].includes(s)) return true;\n  if (['no','n','false','falso'].includes(s)) return false;\n  return v;\n};\n\nconst normDuracion = (v) => {\n  if (v == null) return null;\n  if (typeof v === 'number') {\n    if (v <= 1.5) return '1y';\n    if (v >= 2) return '3y';\n  }\n  if (typeof v === 'string') {\n    const s = v.trim().toLowerCase();\n    const one = ['1y','1 año','1 ano','un año','1 año aprox','1 año aproximadamente'];\n    const three = ['3y','3 años','3 anos','tres años','3 años aprox','3 años aproximadamente'];\n    if (one.includes(s)) return '1y';\n    if (three.includes(s)) return '3y';\n  }\n  return v;\n};\n\nconst cleanJsonText = (txt) => {\n  let t = String(txt).trim();\n  t = t.replace(/^json\\s*/i, '');\n  t = t.replace(/,\\s*}/g, '}');\n  t = t.replace(/,\\s*]/g, ']');\n  return t;\n};\n\nconst normFechaEntrega = (v) => {\n  if (!v || typeof v !== 'string') return null;\n  let s = v.trim().toLowerCase();\n\n  const today = new Date();\n  const addDays = (d) =>\n    new Date(today.getFullYear(), today.getMonth(), today.getDate() + d)\n      .toISOString()\n      .slice(0, 10);\n\n  if (['hoy'].includes(s)) return addDays(0);\n  if (['mañana','manana'].includes(s)) return addDays(1);\n  if (['pasado mañana','pasado manana'].includes(s)) return addDays(2);\n  if (['proxima semana','próxima semana'].includes(s)) return addDays(7);\n\n  // dd/mm/yyyy\n  let m = s.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})$/);\n  if (m) {\n    let [, dd, mm, yy] = m;\n    dd = +dd; mm = +mm - 1; yy = +yy;\n    if (yy < 100) yy += 2000;\n    const d = new Date(yy, mm, dd);\n    if (!isNaN(d)) return d.toISOString().slice(0, 10);\n  }\n\n  return null;\n};\n\n// ---------- Entradas seguras ----------\nconst rootAI = $json ?? {};\nconst ctxIn = safeItem('Attach Logs To Intake');\nconst waIn = safeItem('WhatsApp Trigger');\n\n// ---------- Datos de WhatsApp (fallback ordenado) ----------\nconst body = Object.keys(ctxIn || {}).length ? ctxIn : waIn;\n\nconst waFrom =\n  body?.messages?.[0]?.from ??\n  ctxIn.phoneE164 ??\n  body?.contacts?.[0]?.wa_id ??\n  null;\n\nconst waProfileName =\n  ctxIn.nombre ??\n  body?.contacts?.[0]?.profile?.name ??\n  '';\n\nconst realName = ctxIn.nombre || waProfileName || '';\n\nconst conversationId =\n  body?.messages?.[0]?.conversation_id ??\n  null;\n\nconst msgId =\n  body?.messages?.[0]?.id ??\n  null;\n\n// mensaje actual:\nconst originalMessage =\n  ctxIn.current_user_message ??\n  ctxIn.mensajeOriginal ??\n  body?.messages?.[0]?.text?.body ??\n  body?.text ??\n  '';\n\n// historial:\nconst historyStr = ctxIn.history || '';\nconst lastUserMessage =\n  ctxIn.current_user_message ??\n  ctxIn.firs_user_message ??\n  null;\n\n// ---------- Extraer JSON del agente ----------\nconst raw =\n  rootAI.output ??\n  rootAI.text ??\n  rootAI.response ??\n  rootAI.message ??\n  '';\n\nconst rawStr = String(raw);\nlet candidate = null;\nlet preface = '';\n\nlet block = rawStr.match(/```(?:json)?\\s*([\\s\\S]*?)```/i);\nif (block) {\n  try {\n    candidate = JSON.parse(cleanJsonText(block[1]));\n  } catch {\n    candidate = null;\n  }\n}\n\nif (!candidate) {\n  let obj = rawStr.match(/\\{[\\s\\S]*\\}/m);\n  if (obj) {\n    try {\n      candidate = JSON.parse(cleanJsonText(obj[0]));\n    } catch {\n      candidate = null;\n    }\n  } else {\n    preface = rawStr.trim();\n  }\n}\n\n// ---------- Base del output ----------\nconst base = {\n  status: ctxIn.status || 'intake',\n  done: false,\n  done_final: false,\n  producto_id: null,\n  cliente: { es_colono: false, id_colono: null },\n  parametros: {},\n  ask: '¿Qué deseas cotizar?',\n  needs_human: false,\n  motivo_humano: null,\n  resumen_handoff: null,\n\n  phone: ctxIn.phoneE164 || waFrom || null,\n  contact: { name: realName },\n  conversation_id: conversationId,\n  meta: {\n    source: 'dv-intake',\n    wa_from: waFrom || null,\n    wa_name: realName || null,\n    msg_id: msgId || null,\n  },\n\n  // Mensaje del CLIENTE:\n  message: originalMessage || '',\n  last_user_message: lastUserMessage,\n  history: historyStr,\n};\n\n// Si no hay JSON del agente → solo entregamos base\nif (!candidate) {\n  return [{ json: { ...base, ask: preface || base.ask } }];\n}\n\n// ---------- Normalizar salida del agente ----------\nconst producto = (candidate.producto_id || '').toLowerCase() || null;\n\nlet esColono = normBool(candidate?.cliente?.es_colono);\nconst idColono = candidate?.cliente?.id_colono ?? null;\n\nconst cliente = {\n  es_colono: isBool(esColono) ? esColono : false,\n  id_colono: idColono,\n};\n\nconst paramsIn = candidate.parametros || {};\nconst p = { ...paramsIn };\n\nif (p.hasOwnProperty('cantidad')) p.cantidad = toInt(p.cantidad);\nif (p.hasOwnProperty('ancho_cm')) p.ancho_cm = +p.ancho_cm;\nif (p.hasOwnProperty('alto_cm')) p.alto_cm = +p.alto_cm;\nif (p.hasOwnProperty('tiro_y_retiro')) p.tiro_y_retiro = normBool(p.tiro_y_retiro);\nif (p.hasOwnProperty('con_estructura')) p.con_estructura = normBool(p.con_estructura);\nif (p.hasOwnProperty('duracion')) p.duracion = normDuracion(p.duracion);\n\nconst fechaRaw = p.fecha_entrega || null;\np.fecha_entrega_raw = fechaRaw;\np.fecha_entrega_iso = normFechaEntrega(fechaRaw);\n\n// Pregunta →\nlet ask = candidate.ask?.trim() || candidate.message?.trim() || base.ask;\n\n// Status →\nconst status = typeof candidate.status === 'string'\n  ? candidate.status\n  : base.status;\n\nconst out = {\n  ...base,\n  status,\n  done: isBool(candidate.done) ? candidate.done : false,\n  done_final: isBool(candidate.done_final) ? candidate.done_final : false,\n  producto_id: producto,\n  cliente,\n  parametros: p,\n  ask,\n  needs_human: candidate.needs_human === true,\n  motivo_humano: candidate.motivo_humano ?? null,\n  resumen_handoff: candidate.resumen_handoff ?? null,\n};\n\nreturn [{ json: out }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        576
+      ],
+      "id": "26de7577-b2b5-4b6c-891b-9955bc542643",
+      "name": "Extract JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3845f69a-f796-4741-9fe9-818596266eff",
+              "leftValue": "={{ $json.intake_state_v1.done }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "fcd6ca95-cab4-4b85-aa8c-3cda2d8f5e4e",
+              "leftValue": "={{ $json.needs_human === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        288
+      ],
+      "id": "22bf8bef-c99d-449a-befe-6bedc722b6a0",
+      "name": "¿está completo?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Escalation v3 — DV Intake (safe for Telegram)\n\n// 0) Helper para limpiar caracteres que rompen Markdown de Telegram\nfunction sanitizeForTelegram(text) {\n  if (!text) return '';\n  return text\n    .toString()\n    // caracteres problemáticos en Markdown/MarkdownV2\n    .replace(/[_*[\\]()~`>#+=|{}]/g, ' ');\n}\n\n//////////////////////////////////////\n// 1) Tomar estado desde intake_state_v1\n//////////////////////////////////////\nconst state = $json.intake_state_v1 || $json;\n\nconst producto   = state.producto_id || null;\nconst params     = state.parametros || {};\nconst cliente    = state.cliente || {};\nconst needsHuman = state.needs_human === true;\nconst motivo     = state.motivo_humano || null;\nconst lastAsk    = state.last_ask || state.ask || null;\nconst lastMsg    = state.last_message || $json.message || null;\n\n// Datos del cliente en raíz\nconst nombre = $json.nombre || 'N/D';\nconst phone  = $json.phoneE164 || $json.phone || 'N/D';\n\n//////////////////////////////////////\n// 2) Pretty print de parámetros\n//////////////////////////////////////\nconst prettyParams = (obj) => {\n  const entries = Object.entries(obj || {})\n    .filter(([, v]) => v !== undefined && v !== null && v !== '');\n  if (!entries.length) return 'N/D';\n  return entries\n    .map(([k, v]) => `- ${k}: ${v}`)\n    .join('\\n');\n};\n\n//////////////////////////////////////\n// 3) Construir bloques del resumen\n//////////////////////////////////////\nconst bloques = [\n  '📓 Escalación DV-Intake',\n  `Caso: ${producto || 'N/D'}`,\n  `Cliente: ${nombre || 'N/D'}`,\n  `WA: ${phone || 'N/D'}`,\n  `Motivo: ${motivo || 'N/D'}`,\n  '',\n  'Parámetros (definidos):',\n  prettyParams(params),\n  '',\n  lastMsg ? `Último mensaje del cliente: ${lastMsg}` : null,\n  lastAsk ? `Última pregunta del bot: ${lastAsk}` : null,\n  '',\n].filter(Boolean);\n\n// Unimos y sanitizamos para Telegram\nconst resumenRaw = bloques.join('\\n');\nconst resumenSafe = sanitizeForTelegram(resumenRaw);\n\n//////////////////////////////////////\n// 4) Devolver JSON limpio\n//////////////////////////////////////\nreturn [\n  {\n    json: {\n      resumen: resumenSafe,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        768
+      ],
+      "id": "4c74747e-549f-404e-9416-1164ab2fc733",
+      "name": "Build Escalation"
+    },
+    {
+      "parameters": {
+        "chatId": "7464451486",
+        "text": "={{ $json.resumen }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_notification": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        576
+      ],
+      "id": "633900bf-cc3d-43ab-8517-ccb9c6b9d5f0",
+      "name": "Send a text message",
+      "webhookId": "890a0b5a-316c-48ed-8af3-f514916d0625"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        720
+      ],
+      "id": "5de51479-368a-4143-b338-04a05ea958f6",
+      "name": "WhatsApp Trigger",
+      "webhookId": "fcdb1454-81f3-4298-8e63-fa3970ddebf2",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3845f69a-f796-4741-9fe9-818596266eff",
+              "leftValue": "={{ $json.intake_state_v1.needs_human }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        576
+      ],
+      "id": "fdb96a78-013d-4cba-9675-6a45409e64e3",
+      "name": "¿HTL?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{ $json.phoneE164 }}",
+        "textBody": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        288
+      ],
+      "id": "d54ba6a7-9dd0-4cd1-8abc-deaa113eab02",
+      "name": "Mensaje final precio cotizacion",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "Eres **DV-Closer-Agent**, asistente de cierre de cotizaciones.\n\nRecibes COMO MENSAJE DE USUARIO un JSON de la forma:\n{ status, contact, phoneE164, producto_id, parametros, total_num, total_fmt, breakdown, last_user_message, history }\n\nREGLA CRÍTICA:\n- SOLO debes responder EXACTAMENTE: `WAIT`\n  cuando se cumpla AL MENOS UNA de estas condiciones:\n  • status es distinto de \"priced\"\n  • el campo total_num NO existe, viene null, undefined o vacío\n- Si total_num existe aunque sea 0, NO respondas `WAIT`. Genera igualmente un mensaje de cierre usando la información disponible.\n- Ignora cualquier `WAIT` que aparezca dentro de `history`; eso solo refleja pasos previos del flujo.\n\nCUANDO NO RESPONDAS `WAIT`, HAZ ESTO:\n1) Lee el JSON y usa únicamente los datos que realmente estén presentes (no inventes nada).\n2) Redacta un mensaje breve, claro y amable que incluya:\n   - Producto y cantidad si están disponibles (usa `producto_id` y `parametros`).\n   - Precio total usando `total_fmt`. Si el precio es 0 o no es confiable, dilo explícitamente (ej. “el sistema aún no tiene un total calculado”).\n   - Una línea de condiciones u observaciones si aplica (por ejemplo, si ves flags en `breakdown` o en `parametros`, como si es colono o moneda).\n   - Una pregunta de confirmación + siguiente paso (confirmar pedido, coordinar entrega / envío, forma de pago, etc.).\n3) Usa `history` solo para adaptar el tono y saber en qué punto va la conversación, pero:\n   - NO cambies cantidades, materiales ni fechas.\n   - NO inventes datos que no estén en el JSON.\n\nFORMATO DE RESPUESTA:\n- Devuelve SOLO texto plano, sin comillas ni backticks.\n- Español de Costa Rica, tono profesional y cordial."
+        }
+      },
+      "id": "f9b8d850-43a2-4da1-acc0-d7c305998e40",
+      "name": "AI Agent – Mensaje Final",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        608
+      ],
+      "id": "3ffe8f4d-a1ed-484a-9236-0015e1925348",
+      "name": "Google Gemini Chat Model1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Texto que devolvió el agente\nconst agentRaw = $json.output || $json.message || '';\nconst text = (agentRaw || '').trim();\n\nif (!text) {\n  throw new Error('El agente no devolvió mensaje de cierre.');\n}\n\n// 2) Recuperar el contexto original para obtener el teléfono\n//    Usamos el output de \"Attach Logs To Context\"\nconst ctxItems = $items('Attach Logs To Context');\nconst ctx = (ctxItems[0] && ctxItems[0].json) || {};\n\nconst phone =\n  ctx.phoneE164 ||\n  (ctx.contact && ctx.contact.phone) ||\n  $json.phoneE164 ||\n  ($json.contact && $json.contact.phone) ||\n  null;\n\nif (!phone) {\n  throw new Error('No se encontró número de teléfono para enviar el cierre.');\n}\n\n// 3) Devolver payload limpio para WhatsApp\nreturn [\n  {\n    json: {\n      phoneE164: String(phone),\n      message: text,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        384
+      ],
+      "id": "bd37f7dd-8513-4468-af5d-ebc485201de5",
+      "name": "Map Final Msg from Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// Build Final Context v2 — DV Intake\n// NODO: \"Build Final Context\"\n// ===============================\n\n// 1) Traer el resultado del pricing (input directo del nodo)\nconst pricing = $json || {};\n\n// 2) Traer el estado de intake desde otro nodo\n// Usamos el nodo \"Build State Update\" que ya tiene:\n// { docId, nombre, phoneE164, intake_state_v1: {...} }\nconst stateItem = ($items && $items('Build State Update')?.[0]?.json) || {};\nconst intake = stateItem.intake_state_v1 || {};\n\n// 3) Datos básicos de contacto\nconst phoneE164 =\n  stateItem.phoneE164 ||\n  stateItem.docId ||\n  null;\n\nconst contactName =\n  stateItem.nombre ||\n  (stateItem.contact && stateItem.contact.name) ||\n  '';\n\n// 4) Producto y parámetros\nconst producto_id =\n  pricing.producto_id ||\n  intake.producto_id ||\n  null;\n\nconst params =\n  pricing.parametros ||\n  intake.parametros ||\n  {};\n\nconst es_colono =\n  (typeof pricing.es_colono === 'boolean')\n    ? pricing.es_colono\n    : (intake.cliente && typeof intake.cliente.es_colono === 'boolean'\n        ? intake.cliente.es_colono\n        : false);\n\n// 5) Moneda y totales\nconst moneda   = pricing.moneda || 'CRC';\nconst totalNum = Number(pricing.total_num ?? 0) || 0;\n\n// Si el pricing ya te da el texto formateado, úsalo; si no, lo armamos rápido\nconst totalFmt =\n  pricing.total_fmt ||\n  `${moneda} ${totalNum.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;\n\n// Desglose de cálculo (si lo tienes)\nconst breakdown = pricing.breakdown || {};\n\n// 6) Último mensaje del usuario desde el history\nconst history = Array.isArray(intake.history) ? intake.history : [];\nconst lastMsg =\n  history.length > 0\n    ? (history[history.length - 1].text || '')\n    : '';\n\n// 7) Contexto final para el agente de cierre\nconst ctx = {\n  status: 'priced',\n\n  // Para el agente final\n  contact: {\n    name: contactName,\n    phone: phoneE164,\n  },\n\n  // IMPORTANTE: exponer phoneE164 a nivel raíz\n  phoneE164,\n\n  producto_id,\n\n  parametros: {\n    ...params,\n    es_colono,\n    moneda,\n  },\n\n  total_num: totalNum,\n  total_fmt: totalFmt,\n  breakdown,\n\n  last_user_message: (lastMsg || '').trim(),\n};\n\nreturn [{ json: ctx }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        384
+      ],
+      "id": "91d0609c-b420-48e7-9840-da623ecb4abc",
+      "name": "Build Final Context"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "=clientes",
+        "documentId": "={{ $json.phoneE164 || $json.phone }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -2368,
+        432
+      ],
+      "id": "7f6e688e-9e0f-458e-b44e-064028407b27",
+      "name": "Get State",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==================================\n// Build State Update v3 – DV Intake\n// ==================================\n\n// 1) Estado nuevo que viene del nodo \"Extract JSON\"\nconst state = $json || {};\n\n// 2) Documento previo desde Firestore (nodo \"Get State\")\nlet prevDoc = {};\ntry {\n  const prevItems = $items('Get State', 0) || [];\n  prevDoc = (prevItems[0] && prevItems[0].json) || {};\n} catch (e) {\n  prevDoc = {};\n}\n\nconst prevState = prevDoc.intake_state_v1 || {};\n\n// 3) Datos básicos de contacto\nconst phone =\n  state.contact?.phone ||\n  state.phoneE164 ||\n  state.phone ||\n  prevDoc.phoneE164 ||\n  null;\n\nconst nombre =\n  state.contact?.wa_name ||\n  state.nombre ||\n  prevDoc.nombre ||\n  null;\n\n// 4) Historial: agregamos bloques y dejamos máx. 20\nconst nowIso = new Date().toISOString();\n\nconst lastMessage =\n  state.message ||\n  state.last_user_message ||\n  prevState.last_message ||\n  null;\n\nconst lastAsk =\n  state.ask ??\n  prevState.last_ask ??\n  null;\n\nconst motivo =\n  state.motivo_humano ??\n  prevState.motivo_humano ??\n  null;\n\nconst resumen =\n  state.resumen_handoff ??\n  prevState.resumen_handoff ??\n  null;\n\nconst prevHistory = Array.isArray(prevState.history)\n  ? prevState.history\n  : [];\n\nconst newBlocks = [];\n\n// Entrada de usuario\nif (lastMessage) {\n  newBlocks.push({\n    t: nowIso,\n    from: 'user',\n    source: state.source || 'dv-intake',\n    step: 'intake',\n    text: lastMessage,\n  });\n}\n\n// Entrada de bot (pregunta o motivo)\nif (lastAsk || motivo) {\n  newBlocks.push({\n    t: nowIso,\n    from: 'bot',\n    source: 'dv-intake',\n    step: 'intake',\n    text: lastAsk || motivo,\n  });\n}\n\nconst history = [...prevHistory, ...newBlocks].slice(-20);\n\n// 5) Construir intake_state_v1 fusionando con el previo\nconst intake_state_v1 = {\n  ...prevState,\n\n  producto_id: state.producto_id ?? prevState.producto_id ?? null,\n\n  parametros: {\n    ...(prevState.parametros || {}),\n    ...(state.parametros || {}),\n  },\n\n  cliente: {\n    ...(prevState.cliente || {}),\n    ...(state.cliente || {}),\n    es_colono:\n      state.cliente?.es_colono ??\n      prevState.cliente?.es_colono ??\n      false,\n  },\n\n  status: state.status || prevState.status || 'intake',\n\n  done: state.done ??\n        prevState.done ??\n        false,\n\n  done_final: state.done_final ??\n              prevState.done_final ??\n              false,\n\n  needs_human: state.needs_human ??\n               prevState.needs_human ??\n               false,\n\n  last_ask: lastAsk,\n  last_message: lastMessage,\n  motivo_humano: motivo,\n  resumen_handoff: resumen,\n\n  history,\n  updatedAt: nowIso,\n};\n\n// 6) Campos Trello: sólo preservar (no se recalculan aquí)\nconst trello_boardId = prevDoc.trello_boardId || null;\nconst trello_cardId  = prevDoc.trello_cardId  || null;\n\n// Si ya tenías la URL, se mantiene; si no, se intenta construir\nconst trello_cardURL =\n  prevDoc.trello_cardURL ||\n  (trello_cardId ? `https://trello.com/c/${trello_cardId}` : null);\n\n// Este campo hoy no lo usamos para mover listas (lo hace dv_config)\nconst trello_listId = prevDoc.trello_listId || null;\n\n// 7) Documento final para Upsert\nconst docId = prevDoc.docId || phone;\n\nreturn [{\n  json: {\n    docId,\n    nombre,\n    phoneE164: phone,\n    estado: intake_state_v1.status || prevDoc.estado || 'intake',\n\n    intake_state_v1,\n\n    trello_boardId,\n    trello_cardId,\n    trello_cardURL,\n    trello_listId,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        576
+      ],
+      "id": "19c6a01c-eaac-4311-b4b2-42abfec9b19a",
+      "name": "Build State Update"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "updateKey": "={{ $json.docId || $json.phoneE164 }}",
+        "columns": "docId,nombre,phoneE164,estado,intake_state_v1,trello_boardId,trello_cardId,trello_cardURL,trello_listId"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        480
+      ],
+      "id": "b6c407f8-d120-43f2-bc63-1efbc0beaf42",
+      "name": "Upsert cliente"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -2144,
+        576
+      ],
+      "id": "a9d6f0ce-c51e-4595-b4f7-df2c87dad193",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "298ab669-f643-4b95-840c-2569bd453b95",
+              "name": "phoneE164",
+              "value": "={{$json.phoneE164}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2368,
+        672
+      ],
+      "id": "f410c1e8-69f2-4212-834e-5254171b8e32",
+      "name": "Set telefono"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "projectId": "dv-system-6aade",
+        "collection": "={{ 'clientes/' + $json.phoneE164 + '/logs' }}",
+        "documentId": "={{ $json.msg_id || Date.now().toString() }}",
+        "columns": "phoneE164, from, source, step, text, t"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        768
+      ],
+      "id": "566e588e-77ef-41ec-bb4d-bedac0392562",
+      "name": "Create Intake Log"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Toma el último history[] de intake_state_v1\nconst state = $json.intake_state_v1 || {};\nconst history = state.history || [];\nconst last = history[history.length - 1];\n\nif (!last) {\n  // Nada que loguear\n  return [];\n}\n\nreturn [{\n  json: {\n    phoneE164: $json.phoneE164,\n    from: last.from,\n    source: last.source,\n    step: last.step,\n    text: last.text,\n    t: last.t,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        768
+      ],
+      "id": "06ace7ff-a85c-4c7b-9b17-b24caa006ae9",
+      "name": "Prep Intake Log"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach Logs To Context v3 – DV Closer\n\n// ===============================\n// 1) Tomar contexto base de precio\n// ===============================\n\nlet ctxItems = [];\ntry {\n  // Contexto “bueno” desde Build Final Context\n  ctxItems = $items('Build Final Context');\n} catch (e) {\n  // Fallback: si ese nodo no existe (tests, ejecuciones aisladas),\n  // usamos el propio $json como contexto mínimo.\n  ctxItems = [{ json: $json || {} }];\n}\n\n// Por defecto usamos el último item disponible\nlet ctx = (ctxItems[ctxItems.length - 1]?.json) || ({});\n\n// Si hay algún item con status === \"priced\", usamos ese preferentemente\nfor (let i = ctxItems.length - 1; i >= 0; i--) {\n  const j = ctxItems[i]?.json || {};\n  if (j.status === 'priced') {\n    ctx = j;\n    break;\n  }\n}\n\n// ===============================\n// 2) Traer logs desde Firestore\n// ===============================\n\nlet logsItems = [];\ntry {\n  // nombre nuevo del nodo\n  logsItems = $items('leer logs (intake1)');\n} catch (e) {\n  // fallback al nombre viejo\n  try {\n    logsItems = $items('leer logs');\n  } catch (e2) {\n    logsItems = [];\n  }\n}\n\nconst logsRaw = (logsItems || [])\n  .map(i => i?.json || {})\n  // solo logs que tengan timestamp t\n  .filter(l => l.t);\n\n// Ordenar por fecha ascendente (más viejos primero)\nlogsRaw.sort((a, b) => {\n  const ta = new Date(a.t || 0).getTime();\n  const tb = new Date(b.t || 0).getTime();\n  return ta - tb;\n});\n\n// Nos quedamos con las últimas 10 interacciones\nconst logs = logsRaw.slice(-10);\n\n// ===============================\n// 3) Construir historial compacto\n// ===============================\n\nconst historyLines = logs.map(l => {\n  const ts   = l.t    || '';\n  const from = l.from || 'user';\n  const txt  = l.text || '';\n  return `[${ts}] (${from}) ${txt}`;\n});\n\nconst history = historyLines.length\n  ? historyLines.join('\\n')\n  : 'Sin historial previo.';\n\n// ===============================\n// 4) Devolver **un solo item** al AI Agent\n// ===============================\n\nreturn [\n  {\n    json: {\n      ...ctx,\n      history,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        384
+      ],
+      "id": "67255ec9-2783-4f2f-87f0-f1a67f6a433a",
+      "name": "Attach Logs To Context",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prep Final Log – construir log del mensaje de cierre\n\n// 1) Traer teléfono desde el contexto del pricing\n//    (Build Final Context tiene phoneE164/contact.phone)\nconst ctx =\n  ($items && $items('Build Final Context') && $items('Build Final Context')[0].json) \n  || {};\n\nconst phoneE164 = ctx.phoneE164 || ctx.contact?.phone || null;\n\n// 2) Texto que le vamos a enviar al cliente (salida del agente final)\nconst txt = $json.output || $json.text || $json.message || '';\n\n// 3) Armar objeto de log\nconst log = {\n  phoneE164,\n  from: 'agent',\n  source: 'whatsapp',\n  step: 'closing',\n  text: txt,\n  t: new Date().toISOString(),\n};\n\nreturn [{ json: log }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        480
+      ],
+      "id": "e552af69-9836-4e71-8124-292fd8a87a7f",
+      "name": "Prep Final Log"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "projectId": "dv-system-6aade",
+        "collection": "={{ 'clientes/' + $json.phoneE164 + '/logs' }}",
+        "documentId": "={{ Date.now().toString() }}",
+        "columns": "phoneE164, from, source, step, text, t"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        480
+      ],
+      "id": "f8502031-ac4e-401b-bbf1-3959f3944bf7",
+      "name": "Final log"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "dv-system-6aade",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      {\n        \"collectionId\": \"logs\",\n        \"allDescendants\": true\n      }\n    ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": {\n          \"fieldPath\": \"phoneE164\"\n        },\n        \"op\": \"EQUAL\",\n        \"value\": {\n          \"integerValue\": {{ $json[\"phoneE164\"] }}\n        }\n      }\n    },\n    \"orderBy\": [\n      {\n        \"field\": {\n          \"fieldPath\": \"__name__\"\n        },\n        \"direction\": \"DESCENDING\"\n      }\n    ],\n    \"limit\": 15\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -1472,
+        576
+      ],
+      "id": "cb762d32-bd1e-435b-a27c-ae2ed5a0311a",
+      "name": "leer logs (intake)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach Logs To Intake v6\n// Historial compacto + último mensaje de usuario (logs previos)\n// + mensaje ACTUAL que se manda al agente → current_user_message\n\n//////////////////////////////\n// 1) Contexto del cliente (Merge)\n//////////////////////////////\nconst mergeItems = $items('Merge') || [];\n\n// Base: primer item (suele ser el doc de Firestore)\nconst baseCtx = (mergeItems[0]?.json) || {};\n\n// Mensaje actual: último item (suele traer mensajeOriginal + messages)\nconst lastCtx = (mergeItems[mergeItems.length - 1]?.json) || {};\n\n// Combinamos: datos de cliente + datos del mensaje actual\n// (lastCtx pisa campos del baseCtx cuando existan)\nconst ctx = { ...baseCtx, ...lastCtx };\n\n//////////////////////////////////////\n// 2) Logs crudos desde \"leer logs\"\n//////////////////////////////////////\nconst logsItems = $items('leer logs (intake)') || [];\nconst raw = logsItems\n  .map(i => i.json)\n  .filter(l => l); // por seguridad\n\n///////////////////////////////////////////////////////////////\n// 3) Normalizar logs → { t, from, text }\n///////////////////////////////////////////////////////////////\nconst normLogs = raw\n  .map(l => {\n    // timestamp: usamos t o _createTime\n    const t = l.t || l._createTime || null;\n\n    // quién habla\n    let from = l.from;\n    if (!from) {\n      if (typeof l.current_user_message === 'string' && l.current_user_message.trim() !== '') {\n        from = 'user';\n      } else if (l.source === 'dv-intake') {\n        from = 'bot';\n      } else {\n        from = 'user';\n      }\n    }\n\n    // texto del mensaje\n    let txt = '';\n\n    if (typeof l.text === 'string' && l.text.trim() !== '') {\n      txt = l.text.trim();\n    } else if (l.text && typeof l.text.body === 'string' && l.text.body.trim() !== '') {\n      txt = l.text.body.trim();\n    } else if (typeof l.current_user_message === 'string' && l.current_user_message.trim() !== '') {\n      // NUEVO: logs creados por \"create log Whatsapp\"\n      txt = l.current_user_message.trim();\n    } else if (typeof l.mensajeOriginal === 'string' && l.mensajeOriginal.trim() !== '') {\n      txt = l.mensajeOriginal.trim();\n    }\n\n    return { t, from, text: txt };\n  })\n  // sólo nos quedamos con entradas con tiempo + texto\n  .filter(e => e.t && e.text);\n\n// 3.1) Orden cronológico\nnormLogs.sort((a, b) => {\n  return new Date(a.t).getTime() - new Date(b.t).getTime();\n});\n\n// 3.2) Quitar duplicados exactos (mismo t, from y text)\nconst logs = [];\nfor (const entry of normLogs) {\n  const last = logs[logs.length - 1];\n  if (!last ||\n      last.t !== entry.t ||\n      last.from !== entry.from ||\n      last.text !== entry.text) {\n    logs.push(entry);\n  }\n}\n\n///////////////////////////////////////////////////////////////\n// 4) Construir historial y detectar primer/último mensaje user\n///////////////////////////////////////////////////////////////\nlet lastUserText = '';\nlet firstUserText = '';\n\nconst historyLines = logs.map(l => {\n  if (l.from === 'user' && l.text) {\n    lastUserText = l.text;\n    if (!firstUserText) firstUserText = l.text;\n  }\n  return `[${l.t}] (${l.from}) ${l.text}`;\n});\n\nlet historyStr = historyLines.join('\\n');\nif (!historyStr) historyStr = 'Sin historial previo.';\n\n///////////////////////////////////////////////////////////////\n// 5) Extraer texto del último mensaje ACTUAL (desde ctx.messages)\n///////////////////////////////////////////////////////////////\nlet waLatestText = '';\n\nif (Array.isArray(ctx.messages) && ctx.messages.length > 0) {\n  const lastMsg = ctx.messages[ctx.messages.length - 1];\n\n  if (lastMsg?.text) {\n    if (typeof lastMsg.text === 'string') {\n      waLatestText = lastMsg.text;\n    } else if (typeof lastMsg.text.body === 'string') {\n      waLatestText = lastMsg.text.body;\n    }\n  }\n\n  if (!waLatestText) {\n    waLatestText =\n      lastMsg.mensajeOriginal ||\n      lastMsg.body ||\n      '';\n  }\n}\n\n///////////////////////////////////////////////////////////////\n// 6) Fallback si no hubo mensajes de usuario en logs\n///////////////////////////////////////////////////////////////\nif (!lastUserText) {\n  lastUserText =\n    waLatestText ||\n    ctx.mensajeOriginal ||\n    ctx.mensajeoriginal ||\n    ctx.message ||\n    '';\n}\n\n///////////////////////////////////////////////////////////////\n// 7) Mensaje ACTUAL que usará el agente\n///////////////////////////////////////////////////////////////\n\n// Orden de prioridad:\n// 1) Último texto real del mensaje WA (waLatestText)\n// 2) mensajeOriginal del contexto\n// 3) message genérico del contexto\n// 4) último texto de usuario de los logs\nlet currentUserMessage =\n  waLatestText ||\n  ctx.mensajeOriginal ||\n  ctx.mensajeoriginal ||\n  ctx.message ||\n  '';\n\nif (!currentUserMessage) {\n  currentUserMessage = lastUserText || '';\n}\n\n///////////////////////////////////////////////////////////////\n// 8) Devolver 1 item limpio para el agente\n///////////////////////////////////////////////////////////////\nreturn [\n  {\n    json: {\n      ...ctx,\n      history: historyStr,\n      // primer mensaje del usuario que encontremos en los logs\n      firs_user_message: firstUserText || lastUserText || '',\n      current_user_message: currentUserMessage,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        576
+      ],
+      "id": "7ebfb85d-f86d-4e60-9851-baa6b6df1813",
+      "name": "Attach Logs To Intake"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "projectId": "dv-system-6aade",
+        "collection": "={{ 'clientes/' + $json.phoneE164 + '/logs' }}",
+        "documentId": "={{ $json.msg_id || Date.now().toString() }}",
+        "columns": "phoneE164, current_user_message"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -1696,
+        576
+      ],
+      "id": "31e57fd5-8831-4be5-ac6e-685fa609c215",
+      "name": "create log Whatsaap"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "dv-system-6aade",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      {\n        \"collectionId\": \"logs\",\n        \"allDescendants\": true\n      }\n    ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": {\n          \"fieldPath\": \"phoneE164\"\n        },\n        \"op\": \"EQUAL\",\n        \"value\": {\n          \"integerValue\": {{ $json[\"phoneE164\"] }}\n        }\n      }\n    },\n    \"orderBy\": [\n      {\n        \"field\": {\n          \"fieldPath\": \"__name__\"\n        },\n        \"direction\": \"DESCENDING\"\n      }\n    ],\n    \"limit\": 15\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        288
+      ],
+      "id": "7248acb5-8545-4ed3-8d84-8bf3b0c117e1",
+      "name": "leer logs (intake)1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==================================\n// Prep HTL Session v3\n// Lee siempre del nodo \"Upsert cliente\"\n// ==================================\n\n// 1) Fuente principal: salida del nodo \"Upsert cliente\"\nconst upsertItems = $items('Upsert cliente', 0, 0);\nconst upsert =\n  Array.isArray(upsertItems) ? upsertItems[0] : upsertItems;\n\nconst src = (upsert && upsert.json) ? upsert.json : $json;\n\n// 2) Phone: priorizamos phoneE164, luego docId, luego otros fallbacks\nconst phone =\n  src.phoneE164 ||\n  src.docId ||\n  src.phone ||\n  src.meta?.wa_from ||\n  'N/D';\n\n// 3) Nombre: lo que tengas guardado en el documento del cliente\nconst nombre =\n  src.nombre ||\n  src.contact?.name ||\n  'N/D';\n\n// 4) Resumen para el humano (viene de Build Escalation)\nconst resumen =\n  $json.resumen ||\n  src.intake_state_v1?.resumen_handoff ||\n  '';\n\n// 5) Marca de tiempo\nconst nowIso = new Date().toISOString();\n\n// 6) Payload final para Firestore / Telegram\nreturn [{\n  json: {\n    chatId: 7464451486,    // chat del equipo HTL en Telegram\n    phoneE164: phone,\n    nombre,\n    createdAt: nowIso,\n\n    // Lo que va a leer el humano\n    resumen,\n\n    // Contexto crudo por si lo necesitas después\n    raw: src,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        672
+      ],
+      "id": "876f2f08-4c4c-4a97-9ef1-5d524e5e8507",
+      "name": "Prep HTL Session"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "dv-system-6aade",
+        "collection": "=htl_sessions",
+        "updateKey": "=current_{{$json.chatId}}",
+        "columns": "chatId, phoneE164, nombre, createdAt"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        768
+      ],
+      "id": "5bb34fb8-2330-4653-8158-cf84b19c0ef7",
+      "name": "Prep HTL Session1"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{ $('¿HTL?').item.json.phoneE164 }}",
+        "textBody": "={{ $('¿HTL?').item.json.intake_state_v1.history[1].text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        448,
+        864
+      ],
+      "id": "ab79e562-0cd9-4604-b748-218ddd5fa6ac",
+      "name": "Send messagede espera HTL",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=821545434382738",
+        "recipientPhoneNumber": "={{ $json.phoneE164 || $json.phone || $json.meta.wa_from }}",
+        "textBody": "={{ $('Extract JSON').item.json.ask }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        448,
+        192
+      ],
+      "id": "2f0f53e0-c77c-49e4-9641-b25a2dc83d23",
+      "name": "Send message respuesta agente",
+      "webhookId": "76f01f83-4af3-4e47-a92b-c816de420391"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2592,
+        480
+      ],
+      "id": "92279eab-043b-41ab-9b25-23cfaa89ea16",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================\n// Build Trello Update v6 – DV Intake\n// Code node n8n (JavaScript)\n// ======================================\n\n// Helpers -------------------------------\nconst safeItems = (name, runIndex = 0) => {\n  try {\n    return $items(name, runIndex) || [];\n  } catch (e) {\n    return [];\n  }\n};\n\nconst safeItem = (name, runIndex = 0) => {\n  const arr = safeItems(name, runIndex);\n  return (arr[0] && arr[0].json) || {};\n};\n\nconst cleanIdOrNull = (value) => {\n  if (typeof value !== 'string') return null;\n  const t = value.trim();\n  return t || null;\n};\n\n// 1) Cliente actualizado (nodo \"Clients: Get (refresh)\")\nconst client = safeItem('Clients: Get (refresh)');\n\n// 1b) Estado desde Firestore y desde \"Build State Update\"\nconst stateFromClient = client.intake_state_v1 || {};\nconst stateFromBuild  = safeItem('Build State Update').intake_state_v1 || {};\n\n// Merge: lo más nuevo (Build State Update) pisa lo viejo\nconst state = {\n  ...stateFromClient,\n  ...stateFromBuild,\n};\n\n// 2) Config Trello global (nodo \"DV Trello Config\")\nconst cfg        = safeItem('DV Trello Config');\nconst boardIdCfg = cleanIdOrNull(cfg.boardId || client.trello_boardId);\n\nconst rawLists = cfg.list || {};\nconst listsMap = {\n  validando: cleanIdOrNull(rawLists['lists.validando']),\n  hitl:      cleanIdOrNull(rawLists['lists.hitl']),\n  cotizado:  cleanIdOrNull(rawLists['lists.cotizado']),\n  entregado: cleanIdOrNull(rawLists['lists.entregado']),\n  pendiente: cleanIdOrNull(rawLists['lists.pendiente'] || cfg.defaultListId),\n};\n\n// 3) Estado lógico (done_final / needs_human)\nconst doneFinal  = !!state.done_final;\nconst needsHuman = !!state.needs_human;\nconst status     = state.status || client.estado || 'intake';\n\n// 4) Datos básicos del cliente\nconst phone         = client.phoneE164 || client.phone || '';\nconst nombreCliente = client.nombre || 'Cliente sin nombre';\n\n// 5) Determinar ListId destino según estado\nlet targetListId = null;\n\nif (needsHuman && listsMap.hitl) {\n  // Pasa a lista HITL (revisión humana)\n  targetListId = listsMap.hitl;\n} else if (doneFinal && listsMap.cotizado) {\n  // Pasa a lista COTIZADO\n  targetListId = listsMap.cotizado;\n} else if (status === 'validando' && listsMap.validando) {\n  // Seguimiento normal en \"validando\"\n  targetListId = listsMap.validando;\n} else if (listsMap.pendiente) {\n  // Fallback: lista pendiente / default\n  targetListId = listsMap.pendiente;\n} else {\n  targetListId = cfg.defaultListId || null;\n}\n\n// 6) CardId / URL (para \"Trello: Card Update\")\nconst cardIdFromDoc = cleanIdOrNull(client.trello_cardId);\nconst urlFromDoc    = cleanIdOrNull(client.trello_cardURL);\n\nlet trelloCardId = cardIdFromDoc;\n\n// Si no tenemos id pero sí URL, sacamos el shortLink de /c/<id>/\nif (!trelloCardId && urlFromDoc) {\n  const afterC = (urlFromDoc.split('/c/')[1] || '');\n  const short  = afterC.split(/[/?]/)[0];\n  trelloCardId = short || null;\n}\n\nconst trelloCardURL =\n  urlFromDoc ||\n  (trelloCardId ? `https://trello.com/c/${trelloCardId}` : null);\n\n// 7) Título de la tarjeta -----------------------------\nlet titulo = 'DV – producto sin definir – Público';\nif (state.producto_id) {\n  titulo = `DV – ${state.producto_id} – Público`;\n}\n\n// 8) Descripción según escenario ----------------------\nlet descripcion = '';\n\nif (needsHuman) {\n  // Caso HITL\n  descripcion += `📌 Estado: ${status} (HITL)\\n`;\n  descripcion += `👤 Cliente: ${nombreCliente} (${phone})\\n\\n`;\n  descripcion += `🧠 Motivo HTL:\\n${state.motivo_humano || '(sin motivo)'}\\n\\n`;\n  descripcion += `📝 Resumen para el asesor:\\n${state.resumen_handoff || '(sin resumen)'}\\n\\n`;\n  descripcion += `🔧 Parámetros:\\n${JSON.stringify(state.parametros || {}, null, 2)}\\n`;\n} else if (doneFinal) {\n  // Caso pedido ya cotizado\n  descripcion += `✅ Pedido cotizado\\n`;\n  descripcion += `👤 Cliente: ${nombreCliente} (${phone})\\n\\n`;\n  descripcion += `📄 Detalle (ASK):\\n${state.ask || '(sin detalle)'}\\n\\n`;\n  descripcion += `🔧 Parámetros:\\n${JSON.stringify(state.parametros || {}, null, 2)}\\n`;\n} else {\n  // Flujo normal de intake (solo seguimiento)\n  descripcion += `📌 Estado: ${status}\\n`;\n  descripcion += `👤 Cliente: ${nombreCliente} (${phone})\\n\\n`;\n  descripcion += `💬 Último mensaje del cliente:\\n${state.last_message || '(sin texto)'}\\n\\n`;\n  descripcion += `🤖 Última respuesta del bot:\\n${state.last_ask || '(sin texto)'}\\n\\n`;\n  descripcion += `🔧 Parámetros:\\n${JSON.stringify(state.parametros || {}, null, 2)}\\n`;\n}\n\n// 9) skipTrello\n// Solo actualizamos Trello si hay HITL o done_final.\n// Si los dos están en false, no movemos tarjeta.\nconst skipTrello = !doneFinal && !needsHuman;\n\n// 10) Salida para nodos Trello e IF ¿HTL? -------------\nreturn [\n  {\n    json: {\n      // Para IF Skip Trello y ¿HTL?\n      skipTrello,\n      done_final: doneFinal,\n      needs_human: needsHuman,\n\n      // Datos Trello\n      trello_boardId: boardIdCfg,\n      trello_cardId: trelloCardId,\n      trello_cardURL: trelloCardURL,\n      trello_listId: targetListId,\n\n      trello_title: titulo,\n      trello_desc: descripcion,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "c0d2ef24-fd73-442f-840e-6150de07d0d8",
+      "name": "Build Trello Update"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e654c6dd-0e16-485d-9a0a-6951158c8f1f",
+              "leftValue": "={{$json.skipTrello}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1682140e-3249-4fb4-8e8c-58a301059aab",
+      "name": "IF: Skip Trello"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": {
+          "__rl": true,
+          "value": "={{ $json.trello_cardId }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "desc": "={{$json.trello_desc}}",
+          "idList": "={{$json.trello_listId}}",
+          "name": "={{$json.trello_title}}"
+        }
+      },
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "id": "b4571907-c57e-4da9-acd5-29ecb52cf112",
+      "name": "Trello: Card Update"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "clientes",
+        "documentId": "={{ $json.docId || $json.phoneE164 }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2bc1606e-e96b-448e-a19d-e9420dbd3f54",
+      "name": "Clients: Get (refresh)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "dv-system-6aade",
+        "collection": "dv_config",
+        "documentId": "=trello_status_lists"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "02e9b2dd-1aa4-4a68-841c-3a8984a36719",
+      "name": "DV Trello Config",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach Logs To Intake – WA log v1\n// Saca del Merge el teléfono y el mensaje ACTUAL del cliente\n// Salida: 1 item con { phoneE164, current_user_message }\n\n//////////////////////////////\n// 1) Contexto del cliente (Merge)\n//////////////////////////////\nconst mergeItems = $items('Merge') || [];\n\n// Base: doc de Firestore (Get State)\nconst baseCtx = mergeItems[0]?.json || {};\n\n// Último item: payload del webhook de WhatsApp\nconst waCtx = mergeItems[mergeItems.length - 1]?.json || {};\n\n// Mezcla SIN pisar campos buenos con null del webhook\nconst ctx = { ...baseCtx };\nfor (const [k, v] of Object.entries(waCtx)) {\n  if (v !== null && v !== undefined) {\n    ctx[k] = v;\n  }\n}\n\n//////////////////////////////\n// 2) phoneE164\n//////////////////////////////\nlet phoneE164 =\n  ctx.phoneE164 ||\n  ctx.phone ||\n  ctx.meta?.wa_from ||\n  (Array.isArray(ctx.contacts) && ctx.contacts[0]?.wa_id) ||\n  (Array.isArray(ctx.messages) && ctx.messages[0]?.from) ||\n  '';\n\nphoneE164 = String(phoneE164 || '').trim();\n\n//////////////////////////////\n// 3) current_user_message\n//////////////////////////////\nlet currentUserMessage = '';\n\n// Tomamos SIEMPRE el último mensaje del array messages\nif (Array.isArray(ctx.messages) && ctx.messages.length > 0) {\n  const lastMsg = ctx.messages[ctx.messages.length - 1];\n\n  if (typeof lastMsg.text === 'string') {\n    currentUserMessage = lastMsg.text;\n  } else if (lastMsg.text && typeof lastMsg.text.body === 'string') {\n    currentUserMessage = lastMsg.text.body;\n  } else if (typeof lastMsg.mensajeOriginal === 'string') {\n    currentUserMessage = lastMsg.mensajeOriginal;\n  } else if (typeof lastMsg.body === 'string') {\n    currentUserMessage = lastMsg.body;\n  }\n}\n\n// Fallbacks por si no vino bien el messages[]\nif (!currentUserMessage) {\n  currentUserMessage =\n    ctx.mensajeOriginal ||\n    ctx.mensajeoriginal ||\n    ctx.message ||\n    ctx.text ||\n    '';\n}\n\ncurrentUserMessage = String(currentUserMessage || '').trim();\n\n//////////////////////////////\n// 4) Devolver item para create log Whatsapp\n//////////////////////////////\nreturn [\n  {\n    json: {\n      phoneE164,\n      current_user_message: currentUserMessage,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        576
+      ],
+      "id": "0f9b884f-2be8-44e7-a8e8-955b771dca9b",
+      "name": "WA log v1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Extract JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow (DV-Pricing-Engine)": {
+      "main": [
+        [
+          {
+            "node": "Build Final Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract JSON": {
+      "main": [
+        [
+          {
+            "node": "Build State Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿está completo?": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow (DV-Pricing-Engine)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message respuesta agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Escalation": {
+      "main": [
+        [
+          {
+            "node": "Send messagede espera HTL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep HTL Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set telefono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿HTL?": {
+      "main": [
+        [
+          {
+            "node": "Build Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿está completo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent – Mensaje Final": {
+      "main": [
+        [
+          {
+            "node": "Map Final Msg from Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent – Mensaje Final",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Final Msg from Agent": {
+      "main": [
+        [
+          {
+            "node": "Mensaje final precio cotizacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep Final Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Context": {
+      "main": [
+        [
+          {
+            "node": "Attach Logs To Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "leer logs (intake)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get State": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build State Update": {
+      "main": [
+        [
+          {
+            "node": "Upsert cliente",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep Intake Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert cliente": {
+      "main": [
+        [
+          {
+            "node": "Clients: Get (refresh)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿HTL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "WA log v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set telefono": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prep Intake Log": {
+      "main": [
+        [
+          {
+            "node": "Create Intake Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Logs To Context": {
+      "main": [
+        [
+          {
+            "node": "AI Agent – Mensaje Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Final Log": {
+      "main": [
+        [
+          {
+            "node": "Final log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "leer logs (intake)": {
+      "main": [
+        [
+          {
+            "node": "Attach Logs To Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Logs To Intake": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "leer logs (intake)1": {
+      "main": [
+        [
+          {
+            "node": "Attach Logs To Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep HTL Session": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep HTL Session1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set telefono",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Trello Update": {
+      "main": [
+        [
+          {
+            "node": "IF: Skip Trello",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Skip Trello": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Trello: Card Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients: Get (refresh)": {
+      "main": [
+        [
+          {
+            "node": "DV Trello Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DV Trello Config": {
+      "main": [
+        [
+          {
+            "node": "Build Trello Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create log Whatsaap": {
+      "main": [
+        [
+          {
+            "node": "leer logs (intake)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WA log v1": {
+      "main": [
+        [
+          {
+            "node": "create log Whatsaap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8f851315-f151-41e0-92ff-bacdd7021372",
+  "meta": {
+    "instanceId": "74de3f40f7dd03281c209a774f4ef3a825dc9bed1d417945c83acb6aabc41861"
+  },
+  "id": "zjiL1XhomXJKJxHu",
+  "tags": []
+}
